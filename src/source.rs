@@ -22,6 +22,10 @@ pub struct Line {
 }
 
 impl Line {
+    pub fn offset(&self) -> usize { self.offset }
+    pub fn len(&self) -> usize { self.len }
+    pub fn span(&self) -> Range<usize> { self.offset..self.offset + self.len }
+
     /// The chars of the line, excluding trailing whitespace.
     pub fn chars(&self) -> impl Iterator<Item = char> + '_ { self.chars.chars() }
 }
