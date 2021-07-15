@@ -4,7 +4,7 @@ mod draw;
 mod write;
 
 pub use crate::{
-    source::{Line, Source, Cache, FileCache},
+    source::{Line, Source, Cache, FileCache, FnCache, sources},
 };
 
 use crate::display::*;
@@ -33,6 +33,14 @@ impl Span for Range<usize> {
     fn end(&self) -> usize { self.end }
 }
 
+impl<Id: fmt::Debug + Hash + PartialEq + Eq> Span for (Id, Range<usize>) {
+    type SourceId = Id;
+
+    fn source(&self) -> &Self::SourceId { &self.0 }
+    fn start(&self) -> usize { self.1.start }
+    fn end(&self) -> usize { self.1.end }
+}
+
 pub struct Label<S = Range<usize>> {
     span: S,
     note: Option<String>,
@@ -49,23 +57,23 @@ impl<S> Label<S> {
     }
 }
 
-pub struct Report<S = Range<usize>> {
+pub struct Report<S: Span = Range<usize>> {
     kind: ReportKind,
     code: Option<u32>,
     msg: Option<String>,
-    primary: Label<S>,
-    secondary: Vec<Label<S>>,
+    location: (S::SourceId, usize),
+    labels: Vec<Label<S>>,
     config: Config,
 }
 
 impl<S: Span> Report<S> {
-    pub fn build(kind: ReportKind, primary: Label<S>) -> ReportBuilder<S> {
+    pub fn build(kind: ReportKind, src_id: S::SourceId, offset: usize) -> ReportBuilder<S> {
         ReportBuilder {
             kind,
             code: None,
             msg: None,
-            primary,
-            secondary: Vec::new(),
+            location: (src_id, offset),
+            labels: Vec::new(),
             config: Config::default(),
         }
     }
@@ -96,16 +104,16 @@ impl fmt::Display for ReportKind {
     }
 }
 
-pub struct ReportBuilder<S> {
+pub struct ReportBuilder<S: Span> {
     kind: ReportKind,
     code: Option<u32>,
     msg: Option<String>,
-    primary: Label<S>,
-    secondary: Vec<Label<S>>,
+    location: (S::SourceId, usize),
+    labels: Vec<Label<S>>,
     config: Config,
 }
 
-impl<S> ReportBuilder<S> {
+impl<S: Span> ReportBuilder<S> {
     pub fn with_code(mut self, code: u32) -> Self {
         self.code = Some(code);
         self
@@ -117,7 +125,7 @@ impl<S> ReportBuilder<S> {
     }
 
     pub fn with_label(mut self, label: Label<S>) -> Self {
-        self.secondary.push(label);
+        self.labels.push(label);
         self
     }
 
@@ -131,8 +139,8 @@ impl<S> ReportBuilder<S> {
             kind: self.kind,
             code: self.code,
             msg: self.msg,
-            primary: self.primary,
-            secondary: self.secondary,
+            location: self.location,
+            labels: self.labels,
             config: self.config,
         }
     }

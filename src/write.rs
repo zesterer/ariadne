@@ -19,7 +19,7 @@ struct SourceGroup<'a, S: Span> {
 impl<S: Span> Report<S> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
         let mut groups = Vec::new();
-        for label in std::iter::once(&self.primary).chain(self.secondary.iter()) {
+        for label in self.labels.iter() {
             let src = match cache.fetch(label.span.source()) {
                 Ok(src) => src,
                 Err(e) => {
@@ -87,16 +87,16 @@ impl<S: Span> Report<S> {
             };
 
             // File name
-            let line_ref = if src_id == self.primary.span.source() {
+            let line_ref = if src_id == &self.location.0 {
                 let (line_no, col_no) = src
-                    .get_offset_line(self.primary.span.start())
+                    .get_offset_line(self.location.1)
                     .map(|(_, idx, col)| (format!("{}", idx + 1), format!("{}", col + 1)))
                     .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
                 Some(format!(":{}:{}", line_no, col_no))
             } else {
                 None
             };
-            writeln!(w, "    {}{}{}{}{}{}", draw.ltop, draw.hbar, if i == 0 { draw.lbox } else { draw.lcross }, src_name, Show(line_ref), draw.rbox)?;
+            writeln!(w, "    {}{}{}{}{}{}", if i == 0 { draw.ltop } else { draw.lcross }, draw.hbar, draw.lbox, src_name, Show(line_ref), draw.rbox)?;
 
             if !self.config.compact {
                 writeln!(w, "    {}", draw.vbar)?;
@@ -286,16 +286,17 @@ impl<S: Span> Report<S> {
                     write_margin(&mut w, idx, false, Some((i, true)), &line_labels)?;
                     // Lines
                     for col in 0..arrow_len {
+                        let is_hbar = (col > line_label.col) ^ line_label.multi || (col > line_label.col && line_label.draw_note);
                         let arrow = if col == line_label.col {
                             if line_label.multi {
                                 if line_label.draw_note { draw.mbot } else { draw.rbot }
                             } else {
                                 draw.lbot
                             }
-                        } else if (col > line_label.col) ^ line_label.multi || (col > line_label.col && line_label.draw_note) {
-                            if is_vbar(col) && !self.config.cross_gap { draw.xbar } else { draw.hbar }
                         } else if is_vbar(col) {
-                            draw.vbar
+                            if !self.config.cross_gap && is_hbar { draw.xbar } else { draw.vbar }
+                        } else if is_hbar {
+                            draw.hbar
                         } else {
                             ' '
                         };
