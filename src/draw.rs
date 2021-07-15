@@ -1,18 +1,24 @@
 pub struct Characters {
     pub hbar: char,
     pub vbar: char,
+    pub xbar: char,
     pub vbar_break: char,
 
     pub ltop: char,
+    pub mtop: char,
     pub rtop: char,
     pub lbot: char,
     pub rbot: char,
+    pub mbot: char,
 
     pub lbox: char,
     pub rbox: char,
 
     pub lcross: char,
     pub rcross: char,
+
+    pub underbar: char,
+    pub underline: char,
 }
 
 impl Characters {
@@ -20,15 +26,20 @@ impl Characters {
         Self {
             hbar: '─',
             vbar: '│',
+            xbar: '┼',
             vbar_break: '·',
             ltop: '╭',
+            mtop: '┬',
             rtop: '╮',
             lbot: '╰',
+            mbot: '┴',
             rbot: '╯',
             lbox: '[',
             rbox: ']',
             lcross: '├',
             rcross: '┤',
+            underbar: '┬',
+            underline: '─',
         }
     }
 
@@ -36,15 +47,20 @@ impl Characters {
         Self {
             hbar: '-',
             vbar: '|',
+            xbar: '+',
             vbar_break: ':',
             ltop: ',',
+            mtop: 'v',
             rtop: '.',
             lbot: '`',
+            mbot: '^',
             rbot: '\'',
             lbox: '[',
             rbox: ']',
             lcross: '|',
             rcross: '|',
+            underbar: '^',
+            underline: '^',
         }
     }
 
@@ -52,15 +68,20 @@ impl Characters {
         Self {
             hbar: '─',
             vbar: '│',
+            xbar: '┼',
             vbar_break: '·',
             ltop: '┌',
+            mtop: 'v',
             rtop: '┐',
             lbot: '└',
+            mbot: '^',
             rbot: '┘',
             lbox: '[',
             rbox: ']',
             lcross: '├',
             rcross: '┤',
+            underbar: '^',
+            underline: '^',
         }
     }
 }

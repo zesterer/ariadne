@@ -45,7 +45,7 @@ impl<S: AsRef<str>> From<S> for Source {
                 .map(|line| {
                     let l = Line {
                         offset,
-                        len: line.chars().count(),
+                        len: line.chars().count() + 1, // TODO: Don't assume all newlines are a single character!
                         chars: line.trim_end().to_owned(),
                     };
                     offset += l.len;
@@ -90,7 +90,7 @@ impl Source {
     /// [`Source::line`]).
     pub fn get_line_range<S: Span>(&self, span: &S) -> Range<usize> {
         let start = self.get_offset_line(span.start()).map_or(0, |(_, l, _)| l);
-        let end = self.get_offset_line(span.end().saturating_sub(1)).map_or(self.lines.len(), |(_, l, _)| l + 1);
+        let end = self.get_offset_line(span.end().saturating_sub(1).max(span.start())).map_or(self.lines.len(), |(_, l, _)| l + 1);
         start..end
     }
 }
