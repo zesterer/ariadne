@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/ariadne.svg)](https://crates.io/crates/ariadne)
 [![crates.io](https://docs.rs/ariadne/badge.svg)](https://docs.rs/ariadne)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](https://github.com/zesterer/ariadne)
-![actions-badge](https://github.com/zesterer/ariadne/workflows/Rust/badge.svg?branch=master)
+![actions-badge](https://github.com/zesterer/ariadne/workflows/Rust/badge.svg?branch=main)
 
 A fancy compiler diagnostics crate.
 
