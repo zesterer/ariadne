@@ -87,16 +87,17 @@ impl<S: Span> Report<S> {
             };
 
             // File name
-            let line_ref = if src_id == &self.location.0 {
-                let (line_no, col_no) = src
-                    .get_offset_line(self.location.1)
-                    .map(|(_, idx, col)| (format!("{}", idx + 1), format!("{}", col + 1)))
-                    .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
-                Some(format!(":{}:{}", line_no, col_no))
+            let location = if src_id == &self.location.0 {
+                self.location.1
             } else {
-                None
+                labels[0].label.span.start()
             };
-            writeln!(w, "    {}{}{}{}{}{}", if i == 0 { draw.ltop } else { draw.lcross }, draw.hbar, draw.lbox, src_name, Show(line_ref), draw.rbox)?;
+            let (line_no, col_no) = src
+                .get_offset_line(location)
+                .map(|(_, idx, col)| (format!("{}", idx + 1), format!("{}", col + 1)))
+                .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
+            let line_ref = format!(":{}:{}", line_no, col_no);
+            writeln!(w, "    {}{}{}{}{}{}", if i == 0 { draw.ltop } else { draw.lcross }, draw.hbar, draw.lbox, src_name, line_ref, draw.rbox)?;
 
             if !self.config.compact {
                 writeln!(w, "    {}", draw.vbar)?;
@@ -252,6 +253,7 @@ impl<S: Span> Report<S> {
                     // Should we draw a vertical bar as part of a label arrow on this line?
                     let is_vbar = |col| line_labels
                         .iter()
+                        .filter(|ll| ll.label.note.is_some())
                         .enumerate()
                         .any(|(j, ll)| ll.col == col && ((i <= j && !ll.multi) || (i <= j && ll.multi)));
 
@@ -286,14 +288,15 @@ impl<S: Span> Report<S> {
                     write_margin(&mut w, idx, false, Some((i, true)), &line_labels)?;
                     // Lines
                     for col in 0..arrow_len {
-                        let is_hbar = (col > line_label.col) ^ line_label.multi || (col > line_label.col && line_label.draw_note);
-                        let arrow = if col == line_label.col {
+                        let is_hbar = ((col > line_label.col) ^ line_label.multi || (col > line_label.col && line_label.draw_note))
+                            && line_label.label.note.is_some();
+                        let arrow = if col == line_label.col && line_label.label.note.is_some() {
                             if line_label.multi {
                                 if line_label.draw_note { draw.mbot } else { draw.rbot }
                             } else {
                                 draw.lbot
                             }
-                        } else if is_vbar(col) {
+                        } else if is_vbar(col) && (col != line_label.col || line_label.label.note.is_some()) {
                             if !self.config.cross_gap && is_hbar { draw.xbar } else { draw.vbar }
                         } else if is_hbar {
                             draw.hbar

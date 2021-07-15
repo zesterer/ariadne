@@ -158,7 +158,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            cross_gap: false,
+            cross_gap: true,
             compact: false,
             arrows: true,
         }
