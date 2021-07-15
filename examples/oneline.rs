@@ -26,13 +26,13 @@ fn main() {
         .with_label(Label::new(108..122).with_note("This is *really* nested multi-line"))
         .with_label(Label::new(110..111).with_note("This is an inline within the nesting!"))
         .with_label(Label::new(111..112).with_note("And another!"))
-        .with_label(Label::new(103..123).with_note("This is *really* nested multi-line"))
-        .with_label(Label::new(105..125).with_note("This is *really* nested multi-line"))
-        .with_label(Label::new(107..116).with_note("This is *really* nested multi-line"))
-        .with_label(Label::new(83..117).with_note("Hahaha!"))
-        .with_label(Label::new(85..110).with_note("Oh god, no more 1"))
-        .with_label(Label::new(84..114).with_note("Oh god, no more 2"))
-        .with_label(Label::new(89..113).with_note("Oh god, no more 3"))
+        // .with_label(Label::new(103..123).with_note("This is *really* nested multi-line"))
+        // .with_label(Label::new(105..125).with_note("This is *really* nested multi-line"))
+        // .with_label(Label::new(107..116).with_note("This is *really* nested multi-line"))
+        // .with_label(Label::new(83..117).with_note("Hahaha!"))
+        // .with_label(Label::new(85..110).with_note("Oh god, no more 1"))
+        // .with_label(Label::new(84..114).with_note("Oh god, no more 2"))
+        // .with_label(Label::new(89..113).with_note("Oh god, no more 3"))
         .with_config(Config {
             cross_gap: false,
             compact: false,
