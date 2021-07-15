@@ -7,6 +7,8 @@ pub struct Characters {
     pub xbar: char,
     pub vbar_break: char,
 
+    pub uarrow: char,
+
     pub ltop: char,
     pub mtop: char,
     pub rtop: char,
@@ -31,6 +33,7 @@ impl Characters {
             vbar: '│',
             xbar: '┼',
             vbar_break: '·',
+            uarrow: '🭯',
             ltop: '╭',
             mtop: '┬',
             rtop: '╮',
@@ -52,6 +55,7 @@ impl Characters {
             vbar: '|',
             xbar: '+',
             vbar_break: ':',
+            uarrow: '^',
             ltop: ',',
             mtop: 'v',
             rtop: '.',
@@ -73,6 +77,7 @@ impl Characters {
             vbar: '│',
             xbar: '┼',
             vbar_break: '·',
+            uarrow: '^',
             ltop: '┌',
             mtop: 'v',
             rtop: '┐',
@@ -89,17 +94,38 @@ impl Characters {
     }
 }
 
+/// A trait used to add formatting attributes to displayable items.
+///
+/// Attributes specified through this trait are not composable (i.e: the behaviour of two nested attributes each with a
+/// conflicting attribute is left unspecified).
 pub trait Fmt: Sized {
-    fn fg(self, color: Option<Color>) -> Colored<Self> {
-        Colored(self, color)
+    /// Give this value the specified foreground colour
+    fn fg<C: Into<Option<Color>>>(self, color: C) -> Foreground<Self> {
+        Foreground(self, color.into())
+    }
+
+    /// Give this value the specified background colour
+    fn bg<C: Into<Option<Color>>>(self, color: C) -> Background<Self> {
+        Background(self, color.into())
+    }
+}
+impl<T: fmt::Display> Fmt for T {}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Foreground<T>(T, Option<Color>);
+impl<T: fmt::Display> fmt::Display for Foreground<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(col) = self.1 {
+            write!(f, "{}", Paint::new(&self.0).fg(col))
+        } else {
+            write!(f, "{}", self.0)
+        }
     }
 }
 
-impl<T: fmt::Display> Fmt for T {}
-
-pub struct Colored<T>(T, Option<Color>);
-
-impl<T: fmt::Display> fmt::Display for Colored<T> {
+#[derive(Copy, Clone, Debug)]
+pub struct Background<T>(T, Option<Color>);
+impl<T: fmt::Display> fmt::Display for Background<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(col) = self.1 {
             write!(f, "{}", Paint::new(&self.0).fg(col))

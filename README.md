@@ -1,105 +1,47 @@
-# [WIP] Ariadne
+# Ariadne
 
-A fancy error diagnostics & reporting crate. Designed to be used with [`chumsky`](https://github.com/zesterer/chumsky),
-although not exclusively.
+[![crates.io](https://img.shields.io/crates/v/ariadne.svg)](https://crates.io/crates/ariadne)
+[![crates.io](https://docs.rs/ariadne/badge.svg)](https://docs.rs/ariadne)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](https://github.com/zesterer/ariadne)
+![actions-badge](https://github.com/zesterer/ariadne/workflows/Rust/badge.svg?branch=master)
+
+A fancy compiler diagnostics crate.
+
+## Example
+
+# <img src="misc/example.png" alt="Ariadne supports arbitrary multi-line spans"/>
+
+See [`examples/`](examples/) for more examples.
+
+## About
+
+`ariadne` is a sister project of [`chumsky`](https://github.com/zesterer/chumsky/). Neither are dependent on
+one-another, but I'm working on both simultaneously and like to think that their features complement each other. If
+you're thinking of using `ariadne` to process your compiler's output, why not try using `chumsky` to process its input?
 
 ## Features
 
 - Inline and multi-line labels capable of handling arbitrary configurations of spans
-- Multi-file source support
+- Multi-file errors
 - Generic across custom spans and file caches
+- A choice of character sets to ensure compatibility
+- Coloured labels & highlighting with 256-color support (thanks to [`yansi`](https://github.com/SergioBenitez/yansi))
+- Label priority and ordering
+- Compact mode for smaller diagnostics
+- Correct handling of variable-width characters such as tabs
+- A plethora of other options (tab width, label attach points, underlines, etc.)
 
-## Planned Feature
+## Planned Features
 
-- Support for syntax highlight, coloured text & labels, etc.
-- Probably some other things
+- Improved layout planning & space usage
+- Non-ANSI terminal support
+- More accessibility options (screenreader-friendly mode, textured highlighting as an alternative to color, etc.)
 
-## Examples
+## Credit
 
-The following...
+Thanks to:
 
-```rust
-fn main() {
-    Report::build(ReportKind::Error, "b.tao", 10)
-        .with_code(3)
-        .with_message(format!("Cannot add types Nat and Str"))
-        .with_label(Label::new(("b.tao", 10..14)).with_note("This is of type Nat"))
-        .with_label(Label::new(("b.tao", 17..20)).with_note("This is of type Str"))
-        .with_label(Label::new(("a.tao", 4..8)).with_note("Original definition of 'five' is here"))
-        .finish()
-        .print(sources(vec![
-            ("a.tao", include_str!("a.tao")),
-            ("b.tao", include_str!("b.tao")),
-        ]))
-        .unwrap();
-}
-```
+- `@brendanzab` for their beautiful [`codespan`](https://github.com/brendanzab/codespan) crate that inspired me to try
+  pushing the envelope of error diagnostics.
 
-...produces neat, inline, overlapping labels.
-
-```
-[E03] Error: Cannot add types Nat and Str
-    ╭─[b.tao:1:11]
-    │
-  1 │ def six = five + "1"
-    ·           ──┬─   ─┬─
-    ·             ╰─────│── This is of type Nat
-    ·                   │
-    ·                   ╰── This is of type Str
-    │
-    ├─[a.tao:1:5]
-    │
-  1 │ def five = 5
-    ·     ──┬─
-    ·       ╰── Original definition of 'five' is here
-────╯
-```
-
-The crate can also handle arbitrarily complex spans!
-
-```
-[E03] Error: Incompatible types
-    ╭─[<unknown>:1:14]
-    │
-  1 │         def fives = ["5", 5]
-    ·                           ┬
-    ·                           ╰── This is of type Nat
-  3 │         def sixes = ["6", 6, True, (), []]
-    ·                      ─┬─  ┬  ──┬─  ─┬  ─┬
-    ·                       ╰───┼────┼────┼───┼── This is of type Str
-    ·                           │    │    │   │
-    ·                           ╰────┼────┼───┼── This is of type Nat
-    ·                                │    │   │
-    ·                                ╰────┼───┼── This is of type Bool
-    ·                                     │   │
-    ·                                     ╰───┼── This is of type ()
-    ·                                         │
-    ·                                         ╰── This is of type [_]
-  5 │         def multiline :: Str = match Some 5 in {
-    ·                          ─┬─   │
-    · ╭─────────────────────────┼────╯
-    · │                         │
-    · │                         ╰─────── This is of type Str
-  6 │ │           | Some x => x
-    · │        │     │ │ ┬┬
-    · │ ╭──────╯     │ │ ││
-    · │ │            │ │ ││
-    · │ │ ╭──────────╯ │ ││
-    · │ │ │            │ ││
-    · │ │ │ ╭──────────╯ ││
-    · │ │ │ │            ││
-    · │ │ │ │            ╰┼── This is an inline within the nesting!
-    · │ │ │ │             │
-    · │ │ │ │             ╰── And another!
-  7 │ │ │ │ │     | None => 0
-    · │ │ │ │   │ │   │
-    · │ │ ╰─┼───┴─┼───┼── This is another inner multi-line
-    · │ │   │     │   │
-    · │ │   ╰─────┴───┼── This is a *really* nested multi-line
-    · │ │             │
-    · │ ╰─────────────┴── This is an inner multi-line
-  8 │ │       }
-    · │       │
-    · ╰───────┴── This is of type Nat
-────╯
-```
+- `@estebank` for showing innumerable people just how good compiler diagnostics can be through their work on Rust.

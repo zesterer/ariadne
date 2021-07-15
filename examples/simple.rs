@@ -1,16 +1,10 @@
-use report::{Report, ReportKind, Label, Source};
+use ariadne::{Report, ReportKind, Label, Source};
 
 fn main() {
-    let primary = 34..35;
-    let secondary = 46..49;
-    Report::build(
-        ReportKind::Error,
-        Label::new(primary)
-            .with_note("This is of type Nat")
-    )
-        .with_code(3)
-        .with_message(format!("Incompatible types"))
-        .with_label(Label::new(secondary).with_note("This is of type Str"))
+    Report::build(ReportKind::Error, (), 34)
+        .with_message("Incompatible types")
+        .with_label(Label::new(32..33).with_message("This is of type Nat"))
+        .with_label(Label::new(42..45).with_message("This is of type Str"))
         .finish()
         .print(Source::from(include_str!("sample.tao")))
         .unwrap();

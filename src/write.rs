@@ -58,16 +58,26 @@ impl<S: Span> Report<S> {
         groups
     }
 
-
-
+    /// Write this diagnostic to an implementor of [`Write`].
+    ///
+    /// If you wish to write to `stderr` or `stdout`, you can do so via [`Report::eprint`] or [`Report::print`] respectively.
     pub fn write<C: Cache<S::SourceId>, W: Write>(&self, mut cache: C, mut w: W) -> io::Result<()> {
-        let draw = draw::Characters::unicode();
+        let draw = match self.config.char_set {
+            CharSet::Unicode => draw::Characters::unicode(),
+            CharSet::Ascii => draw::Characters::ascii(),
+            CharSet::ExtendedAscii => draw::Characters::extended_ascii(),
+        };
 
         // --- Header ---
 
-        let code = self.code.map(|c| format!("[{}{:02}]", self.kind.letter(), c));
-        let id = format!("{} {}:", Show(code), self.kind);
-        writeln!(w, "{} {}", id.fg(self.config.err_color()), Show(self.msg.as_ref()))?;
+        let code = self.code.map(|c| format!("[{}{:02}] ", self.kind.letter(), c));
+        let id = format!("{}{}:", Show(code), self.kind);
+        let kind_color = match self.kind {
+            ReportKind::Error => self.config.error_color(),
+            ReportKind::Warning => self.config.warning_color(),
+            ReportKind::Advice => self.config.advice_color(),
+        };
+        writeln!(w, "{} {}", id.fg(kind_color), Show(self.msg.as_ref()))?;
 
         // --- Source sections ---
 
@@ -88,7 +98,7 @@ impl<S: Span> Report<S> {
             };
 
             // File name & reference
-            let location = if src_id == &self.location.0 {
+            let location = if src_id == self.location.0.borrow() {
                 self.location.1
             } else {
                 labels[0].label.span.start()
@@ -119,7 +129,7 @@ impl<S: Span> Report<S> {
                 col: usize,
                 label: &'a Label<S>,
                 multi: bool,
-                draw_note: bool,
+                draw_msg: bool,
             }
 
             // Generate a list of multi-line labels
@@ -212,14 +222,14 @@ impl<S: Span> Report<S> {
                                 col: label.span.start() - line.offset(),
                                 label: **label,
                                 multi: true,
-                                draw_note: false,
+                                draw_msg: false, // Multi-line spans don;t have their messages drawn at the start
                             })
                         } else if is_end {
                             Some(LineLabel {
                                 col: label.last_offset() - line.offset(),
                                 label: **label,
                                 multi: true,
-                                draw_note: true,
+                                draw_msg: true, // Multi-line spans have their messages drawn at the end
                             })
                         } else {
                             None
@@ -232,14 +242,14 @@ impl<S: Span> Report<S> {
                 {
                     if matches!(label_info.kind, LabelKind::Inline) {
                         line_labels.push(LineLabel {
-                            col: match &self.config.label_point {
-                                LabelPoint::Start => label_info.label.span.start(),
-                                LabelPoint::Mid => (label_info.label.span.start() + label_info.label.span.end()) / 2,
-                                LabelPoint::End => label_info.label.last_offset(),
+                            col: match &self.config.label_attach {
+                                LabelAttach::Start => label_info.label.span.start(),
+                                LabelAttach::Middle => (label_info.label.span.start() + label_info.label.span.end()) / 2,
+                                LabelAttach::End => label_info.label.last_offset(),
                             } - line.offset(),
                             label: label_info.label,
                             multi: false,
-                            draw_note: true,
+                            draw_msg: true,
                         });
                     }
                 }
@@ -248,7 +258,7 @@ impl<S: Span> Report<S> {
                 if line_labels.len() == 0 { continue; }
 
                 // Sort the labels by their columns
-                line_labels.sort_by_key(|ll| (!ll.multi, ll.col));
+                line_labels.sort_by_key(|ll| (ll.label.order, !ll.multi, ll.col));
 
                 // Determine label bounds so we know where to put error messages
                 let arrow_end_space = if self.config.compact { 1 } else { 2 };
@@ -263,28 +273,41 @@ impl<S: Span> Report<S> {
                 // Should we draw a vertical bar as part of a label arrow on this line?
                 let get_vbar = |col, row| line_labels
                     .iter()
-                    .filter(|ll| ll.label.note.is_some())
+                    // Only labels with notes get an arrow
+                    .filter(|ll| ll.label.msg.is_some())
                     .enumerate()
                     .find(|(j, ll)| ll.col == col && ((row <= *j && !ll.multi) || (row <= *j && ll.multi)))
                     .map(|(_, ll)| ll);
 
                 let get_highlight = |col| line_labels
                     .iter()
-                    .rev()
-                    .find(|ll| ll.label.span.contains(line.offset() + col));
+                    .filter(|ll| ll.label.span.contains(line.offset() + col))
+                    // Prioritise displaying smaller spans
+                    .min_by_key(|ll| (-ll.label.priority, ll.label.span.len()));
 
                 let get_underline = |col| line_labels
                     .iter()
-                    .filter(|_| self.config.underlines)
-                    .find(|ll| !ll.multi && ll.label.span.contains(line.offset() + col));
+                    .filter(|ll| self.config.underlines
+                        // Underlines only occur for inline spans (highlighting can occur for all spans)
+                        && !ll.multi
+                        && ll.label.span.contains(line.offset() + col))
+                    // Prioritise displaying smaller spans
+                    .min_by_key(|ll| (-ll.label.priority, ll.label.span.len()));
 
                 // Margin
                 write_margin(&mut w, idx, true, None, &line_labels)?;
 
                 // Line
                 for (col, c) in line.chars().enumerate() {
-                    let color = if let Some(highlight) = get_highlight(col) { highlight.label.color } else { None };
-                    write!(w, "{}", if c == '\t' { ' ' } else { c }.fg(color))?;
+                    let color = if let Some(highlight) = get_highlight(col) {
+                        highlight.label.color
+                    } else {
+                        self.config.unimportant_color()
+                    };
+                    let (c, width) = self.config.char_width(c, col);
+                    for _ in 0..width {
+                        write!(w, "{}", c.fg(color))?;
+                    }
                 }
                 write!(w, "\n")?;
 
@@ -296,30 +319,39 @@ impl<S: Span> Report<S> {
                         // Margin alternate
                         write_margin(&mut w, idx, false, Some((row, false)), &line_labels)?;
                         // Lines alternate
+                        let mut chars = line.chars();
                         for col in 0..arrow_len {
+                            let width = chars.next().map_or(1, |c| self.config.char_width(c, col).1);
+
                             let vbar = get_vbar(col, row);
                             let underline = get_underline(col).filter(|_| row == 0);
-                            let c = if let Some(vbar_ll) = vbar {
-                                if underline.is_some() {
+                            let [c, tail] = if let Some(vbar_ll) = vbar {
+                                let [c, tail] = if underline.is_some() {
                                     // TODO: Is this good?
                                     if vbar_ll.label.span.len() <= 1 || true {
-                                        draw.underbar
+                                        [draw.underbar, draw.underline]
                                     } else if line.offset() + col == vbar_ll.label.span.start() {
-                                        draw.ltop
+                                        [draw.ltop, draw.underbar]
                                     } else if line.offset() + col == vbar_ll.label.last_offset() {
-                                        draw.rtop
+                                        [draw.rtop, draw.underbar]
                                     } else {
-                                        draw.underbar
+                                        [draw.underbar, draw.underline]
                                     }
+                                } else if vbar_ll.multi && row == 0 && self.config.multiline_arrows {
+                                    [draw.uarrow, ' ']
                                 } else {
-                                    draw.vbar
-                                }.fg(vbar_ll.label.color)
+                                    [draw.vbar, ' ']
+                                };
+                                [c.fg(vbar_ll.label.color), tail.fg(vbar_ll.label.color)]
                             } else if let Some(underline_ll) = underline {
-                                draw.underline.fg(underline_ll.label.color)
+                                [draw.underline.fg(underline_ll.label.color); 2]
                             } else {
-                                ' '.fg(None)
+                                [' '.fg(None); 2]
                             };
-                            write!(w, "{}", c)?;
+
+                            for i in 0..width {
+                                write!(w, "{}", if i == 0 { c } else { tail })?;
+                            }
                         }
                         write!(w, "\n")?;
                     }
@@ -327,33 +359,52 @@ impl<S: Span> Report<S> {
                     // Margin
                     write_margin(&mut w, idx, false, Some((row, true)), &line_labels)?;
                     // Lines
+                    let mut chars = line.chars();
                     for col in 0..arrow_len {
-                        let is_hbar = ((col > line_label.col) ^ line_label.multi || (col > line_label.col && line_label.draw_note))
-                            && line_label.label.note.is_some();
-                        let arrow = if col == line_label.col && line_label.label.note.is_some() {
+                        let width = chars.next().map_or(1, |c| self.config.char_width(c, col).1);
+
+                        let is_hbar = ((col > line_label.col) ^ line_label.multi || (col > line_label.col && line_label.draw_msg))
+                            && line_label.label.msg.is_some();
+                        let c = if col == line_label.col && line_label.label.msg.is_some() {
                             if line_label.multi {
-                                if line_label.draw_note { draw.mbot } else { draw.rbot }
+                                if line_label.draw_msg { draw.mbot } else { draw.rbot }
                             } else {
                                 draw.lbot
                             }.fg(line_label.label.color)
-                        } else if let Some(vbar_ll) = get_vbar(col, row).filter(|_| (col != line_label.col || line_label.label.note.is_some())) {
+                        } else if let Some(vbar_ll) = get_vbar(col, row).filter(|_| (col != line_label.col || line_label.label.msg.is_some())) {
                             if !self.config.cross_gap && is_hbar { draw.xbar } else { draw.vbar }.fg(vbar_ll.label.color)
                         } else if is_hbar {
                             draw.hbar.fg(line_label.label.color)
                         } else {
                             ' '.fg(None)
                         };
-                        write!(w, "{}", arrow)?;
+
+                        for _ in 0..width {
+                            write!(w, "{}", c)?;
+                        }
                     }
-                    if line_label.draw_note {
-                        write!(w, " {}", Show(line_label.label.note.as_ref()))?;
+                    if line_label.draw_msg {
+                        write!(w, " {}", Show(line_label.label.msg.as_ref()))?;
                     }
                     write!(w, "\n")?;
                 }
             }
 
+            let is_final_group = group_idx + 1 == groups_len;
+
+            // Note
+            if let (Some(note), true) = (&self.note, is_final_group) {
+                if !self.config.compact {
+                    write_margin(&mut w, 0, false, Some((0, false)), &[])?;
+                    write!(w, "\n")?;
+                }
+                write_margin(&mut w, 0, false, Some((0, false)), &[])?;
+                write!(w, "{}: {}\n", "Note".fg(self.config.note_color()), note)?;
+            }
+
+            // Tail of report
             if !self.config.compact {
-                if group_idx + 1 == groups_len {
+                if is_final_group {
                     let final_margin = format!("{}{}{}{}{}", draw.hbar, draw.hbar, draw.hbar, draw.hbar, draw.rbot);
                     writeln!(w, "{}", final_margin.fg(self.config.margin_color()))?;
                 } else {

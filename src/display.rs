@@ -1,7 +1,6 @@
-use super::*;
+use std::fmt::{self, Display};
 
-use std::fmt::{self, Debug, Display};
-
+#[derive(Copy, Clone, Debug)]
 pub struct Show<T>(pub T);
 
 impl<T: Display> Display for Show<Option<T>> {
