@@ -1,6 +1,9 @@
 [package]
 name = "ariadne"
 version = "0.0.0"
+description = "A fancy diagnostics & reporting crate"
+license = "MIT"
+authors = ["Joshua Barretto <joshua.s.barretto@gmail.com>"]
 edition = "2018"
 exclude = [
 	"/misc",
