@@ -1,7 +1,11 @@
 [package]
-name = "report"
-version = "0.1.0"
+name = "ariadne"
+version = "0.0.0"
 edition = "2018"
+exclude = [
+	"/misc",
+	"/misc/*",
+]
 
 [dependencies]
-chumsky = { path = "../chumsky" }
+yansi = "0.5"

@@ -5,7 +5,9 @@ mod write;
 
 pub use crate::{
     source::{Line, Source, Cache, FileCache, FnCache, sources},
+    draw::Fmt,
 };
+pub use yansi::Color;
 
 use crate::display::*;
 use std::{
@@ -22,6 +24,7 @@ pub trait Span {
     fn source(&self) -> &Self::SourceId;
     fn start(&self) -> usize;
     fn end(&self) -> usize;
+    fn len(&self) -> usize { self.end().saturating_sub(self.start()) }
     fn contains(&self, offset: usize) -> bool { (self.start()..self.end()).contains(&offset) }
 }
 
@@ -44,15 +47,21 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq> Span for (Id, Range<usize>) {
 pub struct Label<S = Range<usize>> {
     span: S,
     note: Option<String>,
+    color: Option<Color>,
 }
 
 impl<S> Label<S> {
     pub fn new(span: S) -> Self {
-        Self { span, note: None }
+        Self { span, note: None, color: None }
     }
 
     pub fn with_note<N: ToString>(mut self, note: N) -> Self {
         self.note = Some(note.to_string());
+        self
+    }
+
+    pub fn with_color(mut self, color: Color) -> Self {
+        self.color = Some(color);
         self
     }
 }
@@ -146,21 +155,49 @@ impl<S: Span> ReportBuilder<S> {
     }
 }
 
+pub enum LabelPoint {
+    Start,
+    Mid,
+    End,
+}
+
 pub struct Config {
+    cross_gap: bool,
+    label_point: LabelPoint,
+    compact: bool,
+    underlines: bool,
+    color: bool,
+}
+
+impl Config {
     /// When label lines cross one-another, should there be a gap?
-    pub cross_gap: bool,
+    pub fn with_cross_gap(mut self, cross_gap: bool) -> Self { self.cross_gap = cross_gap; self }
+    /// Where should inline labels attach to their spans?
+    pub fn with_label_point(mut self, label_point: LabelPoint) -> Self { self.label_point = label_point; self }
     /// Whether to minimise gaps between parts of the report.
-    pub compact: bool,
-    /// Whether arrow heads should be preferred for label lines.
-    pub arrows: bool,
+    pub fn with_compact(mut self, compact: bool) -> Self { self.compact = compact; self }
+    /// Whether underlines should be used for label span where possible.
+    pub fn with_underlines(mut self, underlines: bool) -> Self { self.underlines = underlines; self }
+    /// Whether colored output should be enabled.
+    pub fn with_color(mut self, color: bool) -> Self { self.color = color; self }
+
+    fn err_color(&self) -> Option<Color> {
+        Some(Color::Red).filter(|_| self.color)
+    }
+
+    fn margin_color(&self) -> Option<Color> {
+        Some(Color::Fixed(246)).filter(|_| self.color)
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             cross_gap: true,
+            label_point: LabelPoint::Mid,
             compact: false,
-            arrows: true,
+            underlines: true,
+            color: true,
         }
     }
 }

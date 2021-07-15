@@ -1,8 +1,6 @@
-# Report
+# [WIP] Ariadne
 
-
-
-An as-yet unnamed fancy error diagnostics & reporting crate. Designed to be used with [`chumsky`](https://github.com/zesterer/chumsky),
+A fancy error diagnostics & reporting crate. Designed to be used with [`chumsky`](https://github.com/zesterer/chumsky),
 although not exclusively.
 
 ## Features

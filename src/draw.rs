@@ -1,3 +1,6 @@
+use super::*;
+use yansi::Paint;
+
 pub struct Characters {
     pub hbar: char,
     pub vbar: char,
@@ -59,7 +62,7 @@ impl Characters {
             rbox: ']',
             lcross: '|',
             rcross: '|',
-            underbar: '^',
+            underbar: '|',
             underline: '^',
         }
     }
@@ -82,6 +85,26 @@ impl Characters {
             rcross: '┤',
             underbar: '^',
             underline: '^',
+        }
+    }
+}
+
+pub trait Fmt: Sized {
+    fn fg(self, color: Option<Color>) -> Colored<Self> {
+        Colored(self, color)
+    }
+}
+
+impl<T: fmt::Display> Fmt for T {}
+
+pub struct Colored<T>(T, Option<Color>);
+
+impl<T: fmt::Display> fmt::Display for Colored<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(col) = self.1 {
+            write!(f, "{}", Paint::new(&self.0).fg(col))
+        } else {
+            write!(f, "{}", self.0)
         }
     }
 }
