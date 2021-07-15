@@ -1,4 +1,4 @@
-use ariadne::{Report, ReportKind, Label, Source, Config, Color, Fmt, sources};
+use ariadne::{Report, ReportKind, Label, Color, Fmt, sources};
 
 fn main() {
     Report::build(ReportKind::Error, "b.tao", 10)
