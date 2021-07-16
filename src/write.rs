@@ -193,7 +193,7 @@ impl<S: Span> Report<S> {
                                     }
 
                                     if is_arrow {
-                                        hbar = Some(label);
+                                        hbar = Some(**label);
                                         if !is_parent {
                                             corner = Some((label, is_start));
                                         }
@@ -204,6 +204,14 @@ impl<S: Span> Report<S> {
                                     vbar = vbar.or(Some(*label).filter(|_| !is_parent && (is_start ^ (report_row < label_row))));
                                 }
                             }
+                        }
+                    }
+
+                    if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
+                        let is_col = **multi_label as *const _ == margin.label as *const _;
+                        let is_limit = col + 1 == multi_labels.len();
+                        if !is_col && !is_limit {
+                            hbar = hbar.or(Some(margin.label));
                         }
                     }
 
