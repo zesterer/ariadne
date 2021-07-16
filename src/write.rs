@@ -293,6 +293,7 @@ impl<S: Span> Report<S> {
                         }
                     })
                     .min_by_key(|ll| (ll.col, !ll.label.span.start()));
+
                 // Generate a list of labels for this line, along with their label columns
                 let mut line_labels = multi_labels
                     .iter()
@@ -319,6 +320,7 @@ impl<S: Span> Report<S> {
                         }
                     })
                     .collect::<Vec<_>>();
+
                 for label_info in labels
                     .iter()
                     .filter(|l| l.label.span.start() >= line.span().start && l.label.span.end() <= line.span().end)
@@ -341,7 +343,7 @@ impl<S: Span> Report<S> {
                 if line_labels.len() == 0 && margin_label.is_none() { continue; }
 
                 // Sort the labels by their columns
-                line_labels.sort_by_key(|ll| (ll.label.order, if ll.multi && ll.draw_msg { !ll.col } else { ll.col }, !ll.label.span.start()));
+                line_labels.sort_by_key(|ll| (ll.label.order, ll.col, !ll.label.span.start()));
 
                 // Determine label bounds so we know where to put error messages
                 let arrow_end_space = if self.config.compact { 1 } else { 2 };
