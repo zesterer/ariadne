@@ -142,7 +142,7 @@ pub struct ColorGenerator {
 }
 
 impl Default for ColorGenerator {
-    fn default() -> Self { Self::from_state([58000, 15000, 32000], 0.5) }
+    fn default() -> Self { Self::from_state([30000, 15000, 35000], 0.5) }
 }
 
 impl ColorGenerator {
@@ -162,7 +162,7 @@ impl ColorGenerator {
     pub fn next(&mut self) -> Color {
         for i in 0..3 {
             // magic constant, one of only two that have this property!
-            self.state[i] = (self.state[i] as usize).wrapping_add(40503 * (i + 256)) as u16;
+            self.state[i] = (self.state[i] as usize).wrapping_add(40503 * (i * 4 + 1130)) as u16;
         }
         Color::Fixed(16
             + ((self.state[2] as f32 / 65535.0 * (1.0 - self.min_brightness) + self.min_brightness) * 5.0

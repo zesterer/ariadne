@@ -1,4 +1,4 @@
-use ariadne::{Report, ReportKind, Label, Source, Config, Color, ColorGenerator};
+use ariadne::{Report, ReportKind, Label, Source, Config, Color, ColorGenerator, Fmt};
 
 fn main() {
     let mut colors = ColorGenerator::new();
@@ -51,7 +51,7 @@ fn main() {
         .with_label(Label::new(("stresstest.tao", 84..114)).with_message("Oh god, no more 2").with_color(colors.next()))
         .with_label(Label::new(("stresstest.tao", 89..113)).with_message("Oh god, no more 3").with_color(colors.next()))
         .with_config(Config::default()
-            .with_cross_gap(false)
+            .with_cross_gap(true)
             .with_compact(true)
             .with_underlines(true)
             .with_tab_width(4))

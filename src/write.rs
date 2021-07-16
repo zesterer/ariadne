@@ -258,7 +258,7 @@ impl<S: Span> Report<S> {
                 if line_labels.len() == 0 { continue; }
 
                 // Sort the labels by their columns
-                line_labels.sort_by_key(|ll| (ll.label.order, !ll.multi, ll.col));
+                line_labels.sort_by_key(|ll| (ll.label.order, ll.multi, ll.col));
 
                 // Determine label bounds so we know where to put error messages
                 let arrow_end_space = if self.config.compact { 1 } else { 2 };
@@ -363,8 +363,8 @@ impl<S: Span> Report<S> {
                     for col in 0..arrow_len {
                         let width = chars.next().map_or(1, |c| self.config.char_width(c, col).1);
 
-                        let is_hbar = ((col > line_label.col) ^ line_label.multi || (col > line_label.col && line_label.draw_msg))
-                            && line_label.label.msg.is_some();
+                        let is_hbar = ((col > line_label.col) ^ line_label.multi)
+                            || (line_label.label.msg.is_some() && line_label.draw_msg && col > line_label.col);
                         let c = if col == line_label.col && line_label.label.msg.is_some() {
                             if line_label.multi {
                                 if line_label.draw_msg { draw.mbot } else { draw.rbot }
@@ -372,7 +372,13 @@ impl<S: Span> Report<S> {
                                 draw.lbot
                             }.fg(line_label.label.color)
                         } else if let Some(vbar_ll) = get_vbar(col, row).filter(|_| (col != line_label.col || line_label.label.msg.is_some())) {
-                            if !self.config.cross_gap && is_hbar { draw.xbar } else { draw.vbar }.fg(vbar_ll.label.color)
+                            if !self.config.cross_gap && is_hbar {
+                                draw.xbar.fg(line_label.label.color)
+                            } else if is_hbar {
+                                draw.hbar.fg(line_label.label.color)
+                            } else {
+                                draw.vbar.fg(vbar_ll.label.color)
+                            }
                         } else if is_hbar {
                             draw.hbar.fg(line_label.label.color)
                         } else {
