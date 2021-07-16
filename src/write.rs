@@ -1,5 +1,13 @@
 use super::*;
 
+// A WARNING, FOR ALL YE WHO VENTURE IN HERE
+//
+// - This code is complex and has a lot of implicit invariants
+// - Yes, it has some bugs
+// - Yes, it needs rewriting
+// - No, you are not expected to understand it. I will probably not understand it either in a month, but that will only
+//   give me a reason to rewrite it
+
 enum LabelKind {
     Inline,
     Multiline,
@@ -284,7 +292,7 @@ impl<S: Span> Report<S> {
                             None
                         }
                     })
-                    .min_by_key(|ll| ll.col);
+                    .min_by_key(|ll| (ll.col, !ll.label.span.start()));
                 // Generate a list of labels for this line, along with their label columns
                 let mut line_labels = multi_labels
                     .iter()
@@ -333,7 +341,7 @@ impl<S: Span> Report<S> {
                 if line_labels.len() == 0 && margin_label.is_none() { continue; }
 
                 // Sort the labels by their columns
-                line_labels.sort_by_key(|ll| (ll.label.order, ll.multi, ll.col));
+                line_labels.sort_by_key(|ll| (ll.label.order, if ll.multi && ll.draw_msg { !ll.col } else { ll.col }, !ll.label.span.start()));
 
                 // Determine label bounds so we know where to put error messages
                 let arrow_end_space = if self.config.compact { 1 } else { 2 };
@@ -349,9 +357,9 @@ impl<S: Span> Report<S> {
                 let get_vbar = |col, row| line_labels
                     .iter()
                     // Only labels with notes get an arrow
-                    .filter(|ll| ll.label.msg.is_some() && margin_label.as_ref().map_or(true, |m| ll.label as *const _ != m.label as *const _))
                     .enumerate()
-                    .find(|(j, ll)| ll.col == col && ((row <= *j && !ll.multi) || (row <= *j + 1 && ll.multi)))
+                    .filter(|(_, ll)| ll.label.msg.is_some() && margin_label.as_ref().map_or(true, |m| ll.label as *const _ != m.label as *const _))
+                    .find(|(j, ll)| ll.col == col && ((row <= *j && !ll.multi) || (row <= *j && ll.multi)))
                     .map(|(_, ll)| ll);
 
                 let get_highlight = |col| margin_label

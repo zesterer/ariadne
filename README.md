@@ -32,12 +32,20 @@ you're thinking of using `ariadne` to process your compiler's output, why not tr
 - Correct handling of variable-width characters such as tabs
 - A `ColorGenerator` type that generates distinct colours for visual elements.
 - A plethora of other options (tab width, label attach points, underlines, etc.)
+- Built-in ordering/overlap heuristics that come up with the best way to avoid overlapping & label crossover
 
 ## Planned Features
 
 - Improved layout planning & space usage
 - Non-ANSI terminal support
 - More accessibility options (screenreader-friendly mode, textured highlighting as an alternative to color, etc.)
+
+## Stability
+
+The API (should) follow [semver](semver.org/). However, this apply to the layout of final error messages. Minor tweaks
+to the internal layout heuristics can often result in the exact format of error messages changing with labels moving
+slightly. If you experience a change in layout that you believe to be a regression (either the change is incorrect, or
+makes your diagnostics harder to read) then please open an issue.
 
 ## Credit
 

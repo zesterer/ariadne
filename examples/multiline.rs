@@ -7,6 +7,7 @@ fn main() {
     let a = colors.next();
     let b = colors.next();
     let out = Color::Fixed(81);
+    let out2= colors.next();
 
     Report::build(ReportKind::Error, "sample.tao", 12)
         .with_code(3)
@@ -23,6 +24,12 @@ fn main() {
                 "match".fg(out),
             ))
             .with_color(out))
+        .with_label(Label::new(("sample.tao", 0..48))
+            .with_message(format!(
+                "The {} has a problem",
+                "definition".fg(out2),
+            ))
+            .with_color(out2))
         .with_note(format!("Outputs of {} expressions must coerce to the same type", "match".fg(out)))
         .finish()
         .print(("sample.tao", Source::from(include_str!("sample.tao"))))
