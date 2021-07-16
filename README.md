@@ -16,7 +16,7 @@ See [`examples/`](examples/) for more examples.
 ## About
 
 `ariadne` is a sister project of [`chumsky`](https://github.com/zesterer/chumsky/). Neither are dependent on
-one-another, but I'm working on both simultaneously and like to think that their features complement each other. If
+one-another, but I'm working on both simultaneously and like to think that their features compliment each other. If
 you're thinking of using `ariadne` to process your compiler's output, why not try using `chumsky` to process its input?
 
 ## Features
