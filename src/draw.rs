@@ -8,6 +8,7 @@ pub struct Characters {
     pub vbar_break: char,
 
     pub uarrow: char,
+    pub rarrow: char,
 
     pub ltop: char,
     pub mtop: char,
@@ -34,6 +35,7 @@ impl Characters {
             xbar: '┼',
             vbar_break: '·',
             uarrow: '🭯',
+            rarrow: '▶',
             ltop: '╭',
             mtop: '┬',
             rtop: '╮',
@@ -56,6 +58,7 @@ impl Characters {
             xbar: '+',
             vbar_break: ':',
             uarrow: '^',
+            rarrow: '>',
             ltop: ',',
             mtop: 'v',
             rtop: '.',
@@ -78,6 +81,7 @@ impl Characters {
             xbar: '┼',
             vbar_break: '·',
             uarrow: '^',
+            rarrow: '>',
             ltop: '┌',
             mtop: 'v',
             rtop: '┐',
