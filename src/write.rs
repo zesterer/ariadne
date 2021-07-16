@@ -358,6 +358,7 @@ impl<S: Span> Report<S> {
                     .iter()
                     .map(|ll| ll.label)
                     .chain(multi_labels.iter().map(|l| **l))
+                    .chain(line_labels.iter().map(|l| l.label))
                     .filter(|l| l.span.contains(line.offset() + col))
                     // Prioritise displaying smaller spans
                     .min_by_key(|l| (-l.priority, l.span.len()));
