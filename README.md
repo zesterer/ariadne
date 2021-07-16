@@ -25,10 +25,12 @@ you're thinking of using `ariadne` to process your compiler's output, why not tr
 - Multi-file errors
 - Generic across custom spans and file caches
 - A choice of character sets to ensure compatibility
-- Coloured labels & highlighting with 256-color support (thanks to [`yansi`](https://github.com/SergioBenitez/yansi))
+- Coloured labels & highlighting with 8-bit and 24-bit color support (thanks to
+  [`yansi`](https://github.com/SergioBenitez/yansi))
 - Label priority and ordering
 - Compact mode for smaller diagnostics
 - Correct handling of variable-width characters such as tabs
+- A `ColorGenerator` type that generates distinct colours for visual elements.
 - A plethora of other options (tab width, label attach points, underlines, etc.)
 
 ## Planned Features

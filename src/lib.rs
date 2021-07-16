@@ -37,7 +37,7 @@ mod write;
 
 pub use crate::{
     source::{Line, Source, Cache, FileCache, FnCache, sources},
-    draw::Fmt,
+    draw::{Fmt, ColorGenerator},
 };
 pub use yansi::Color;
 
