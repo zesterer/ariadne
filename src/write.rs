@@ -140,6 +140,9 @@ impl<S: Span> Report<S> {
                 }
             }
 
+            // Sort multiline labels by length
+            multi_labels.sort_by_key(|m| -(m.span.len() as isize));
+
             let write_margin = |
                 w: &mut W, idx: usize,
                 is_line: bool,
@@ -157,16 +160,16 @@ impl<S: Span> Report<S> {
                 write!(w, "{}", line_no_margin.fg(self.config.margin_color()))?;
 
                 // Multi-line margins
-                for col in 0..multi_labels.len() {
+                for col in 0..multi_labels.len() + (multi_labels.len() > 0) as usize {
                     let mut corner = None;
                     let mut hbar = None;
                     let mut vbar: Option<&&Label<S>> = None;
                     let mut margin_ptr = None;
 
-                    let multi_label = &multi_labels[col];
+                    let multi_label = multi_labels.get(col);
                     let line_span = src.line(idx).unwrap().span();
 
-                    for (i, label) in multi_labels[0..=col].iter().enumerate() {
+                    for (i, label) in multi_labels[0..(col + 1).min(multi_labels.len())].iter().enumerate() {
                         let margin = margin_label
                             .as_ref()
                             .filter(|m| **label as *const _ == m.label as *const _);
@@ -208,12 +211,14 @@ impl<S: Span> Report<S> {
                     }
 
                     if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
-                        let is_col = **multi_label as *const _ == margin.label as *const _;
+                        let is_col = multi_label.map_or(false, |ml| **ml as *const _ == margin.label as *const _);
                         let is_limit = col + 1 == multi_labels.len();
                         if !is_col && !is_limit {
                             hbar = hbar.or(Some(margin.label));
                         }
                     }
+
+                    hbar = hbar.filter(|l| margin_label.as_ref().map_or(true, |margin| margin.label as *const _ != *l as *const _) || !is_line);
 
                     let (a, b) = if let Some((label, is_start)) = corner {
                         (if is_start { draw.ltop } else { draw.lbot }.fg(label.color), draw.hbar.fg(label.color))
@@ -224,11 +229,21 @@ impl<S: Span> Report<S> {
                     } else if let Some(label) = vbar {
                         (draw.vbar.fg(label.color), ' '.fg(None))
                     } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
-                        let is_col = **multi_label as *const _ == margin.label as *const _;
-                        let is_limit = col + 1 == multi_labels.len();
+                        let is_col = multi_label.map_or(false, |ml| **ml as *const _ == margin.label as *const _);
+                        let is_limit = col == multi_labels.len();
                         (
-                            if is_col { if is_start { draw.ltop } else { draw.lcross } } else { draw.hbar }.fg(margin.label.color),
-                            if is_limit { draw.rarrow } else { draw.hbar }.fg(margin.label.color),
+                            if is_limit {
+                                draw.rarrow
+                            } else if is_col {
+                                if is_start { draw.ltop } else { draw.lcross }
+                            } else {
+                                draw.hbar
+                            }.fg(margin.label.color),
+                            if !is_limit {
+                                draw.hbar
+                            } else {
+                                ' '
+                            }.fg(margin.label.color),
                         )
                     } else {
                         (' '.fg(None), ' '.fg(None))
@@ -438,7 +453,10 @@ impl<S: Span> Report<S> {
                             } else if is_hbar {
                                 [draw.hbar.fg(line_label.label.color); 2]
                             } else {
-                                [draw.vbar.fg(vbar_ll.label.color), ' '.fg(line_label.label.color)]
+                                [
+                                    if vbar_ll.multi && row == 0 && self.config.compact { draw.uarrow } else { draw.vbar }.fg(vbar_ll.label.color),
+                                    ' '.fg(line_label.label.color),
+                                ]
                             }
                         } else if is_hbar {
                             [draw.hbar.fg(line_label.label.color); 2]
