@@ -356,10 +356,11 @@ impl<S: Span> Report<S> {
 
                 let get_highlight = |col| margin_label
                     .iter()
-                    .chain(line_labels.iter())
-                    .filter(|ll| ll.label.span.contains(line.offset() + col))
+                    .map(|ll| ll.label)
+                    .chain(multi_labels.iter().map(|l| **l))
+                    .filter(|l| l.span.contains(line.offset() + col))
                     // Prioritise displaying smaller spans
-                    .min_by_key(|ll| (-ll.label.priority, ll.label.span.len()));
+                    .min_by_key(|l| (-l.priority, l.span.len()));
 
                 let get_underline = |col| line_labels
                     .iter()
@@ -376,7 +377,7 @@ impl<S: Span> Report<S> {
                 // Line
                 for (col, c) in line.chars().enumerate() {
                     let color = if let Some(highlight) = get_highlight(col) {
-                        highlight.label.color
+                        highlight.color
                     } else {
                         self.config.unimportant_color()
                     };
