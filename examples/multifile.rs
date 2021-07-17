@@ -1,4 +1,4 @@
-use ariadne::{Report, ReportKind, Label, Color, ColorGenerator, Fmt, sources};
+use ariadne::{Report, ReportKind, Label, ColorGenerator, Fmt, sources};
 
 fn main() {
     let mut colors = ColorGenerator::new();
