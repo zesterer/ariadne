@@ -87,9 +87,35 @@ impl<S: Span> Report<S> {
         };
         writeln!(w, "{} {}", id.fg(kind_color), Show(self.msg.as_ref()))?;
 
-        // --- Source sections ---
-
         let groups = self.get_source_groups(&mut cache);
+
+        // Line number maximum width
+        let line_no_width = groups
+            .iter()
+            .filter_map(|SourceGroup { span, src_id, .. }| {
+                let src_name = cache
+                    .display(src_id)
+                    .map(|d| d.to_string())
+                    .unwrap_or_else(|| "<unknown>".to_string());
+
+                let src = match cache.fetch(src_id) {
+                    Ok(src) => src,
+                    Err(e) => {
+                        eprintln!("Unable to fetch source {}: {:?}", src_name, e);
+                        return None;
+                    },
+                };
+
+                let line_range = src.get_line_range(span);
+                Some((1..)
+                    .map(|x| 10u32.pow(x))
+                    .take_while(|x| line_range.end as u32 / x != 0)
+                    .count() + 1)
+            })
+            .max()
+            .unwrap_or(0);
+
+        // --- Source sections ---
         let groups_len = groups.len();
         for (group_idx, SourceGroup { src_id, span, labels }) in groups.into_iter().enumerate() {
             let src_name = cache
@@ -105,6 +131,8 @@ impl<S: Span> Report<S> {
                 },
             };
 
+            let line_range = src.get_line_range(&span);
+
             // File name & reference
             let location = if src_id == self.location.0.borrow() {
                 self.location.1
@@ -118,7 +146,8 @@ impl<S: Span> Report<S> {
             let line_ref = format!(":{}:{}", line_no, col_no);
             writeln!(
                 w,
-                "    {}{}{}{}{}{}",
+                "{}{}{}{}{}{}{}",
+                Show((' ', line_no_width + 2)),
                 if group_idx == 0 { draw.ltop } else { draw.lcross }.fg(self.config.margin_color()),
                 draw.hbar.fg(self.config.margin_color()),
                 draw.lbox.fg(self.config.margin_color()),
@@ -128,10 +157,8 @@ impl<S: Span> Report<S> {
             )?;
 
             if !self.config.compact {
-                writeln!(w, "    {}", draw.vbar.fg(self.config.margin_color()))?;
+                writeln!(w, "{}{}", Show((' ', line_no_width + 2)), draw.vbar.fg(self.config.margin_color()))?;
             }
-
-            let line_range = src.get_line_range(&span);
 
             struct LineLabel<'a, S> {
                 col: usize,
@@ -159,13 +186,23 @@ impl<S: Span> Report<S> {
                 margin_label: &Option<LineLabel<S>>
             | -> std::io::Result<()> {
                 let line_no_margin = if is_line {
-                    let line_no = format!("{:>3}", idx + 1);
-                    format!("{} {} ", line_no, draw.vbar)
+                    let line_no = format!("{}", idx + 1);
+                    format!(
+                        "{}{} {}",
+                        Show((' ', line_no_width - line_no.chars().count())),
+                        line_no,
+                        draw.vbar,
+                    )
                 } else {
-                    format!("    {} ", draw.vbar_break)
+                    format!("{}{}", Show((' ', line_no_width + 1)), draw.vbar_break)
                 };
 
-                write!(w, "{}", line_no_margin.fg(self.config.margin_color()))?;
+                write!(
+                    w,
+                    " {}{}",
+                    line_no_margin.fg(self.config.margin_color()),
+                    Show(Some(' ').filter(|_| !self.config.compact)),
+                )?;
 
                 // Multi-line margins
                 for col in 0..multi_labels.len() + (multi_labels.len() > 0) as usize {
@@ -505,10 +542,10 @@ impl<S: Span> Report<S> {
             // Tail of report
             if !self.config.compact {
                 if is_final_group {
-                    let final_margin = format!("{}{}{}{}{}", draw.hbar, draw.hbar, draw.hbar, draw.hbar, draw.rbot);
+                    let final_margin = format!("{}{}", Show((draw.hbar, line_no_width + 2)), draw.rbot);
                     writeln!(w, "{}", final_margin.fg(self.config.margin_color()))?;
                 } else {
-                    writeln!(w, "    {}", draw.vbar.fg(self.config.margin_color()))?;
+                    writeln!(w, "{}{}", Show((' ', line_no_width + 2)), draw.vbar.fg(self.config.margin_color()))?;
                 }
             }
         }
