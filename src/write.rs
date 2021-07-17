@@ -255,7 +255,7 @@ impl<S: Span> Report<S> {
                         }
                     }
 
-                    if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
+                    if let (Some((margin, _is_start)), true) = (margin_ptr, is_line) {
                         let is_col = multi_label.map_or(false, |ml| **ml as *const _ == margin.label as *const _);
                         let is_limit = col + 1 == multi_labels.len();
                         if !is_col && !is_limit {
@@ -305,10 +305,10 @@ impl<S: Span> Report<S> {
             for idx in line_range {
                 let line = src.line(idx).unwrap();
 
-                let mut margin_label = multi_labels
+                let margin_label = multi_labels
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, label)| {
+                    .filter_map(|(_i, label)| {
                         let is_start = line.span().contains(&label.span.start());
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start { // TODO: Check to see whether multi is the first on the start line or first on the end line
@@ -335,7 +335,7 @@ impl<S: Span> Report<S> {
                 let mut line_labels = multi_labels
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, label)| {
+                    .filter_map(|(_i, label)| {
                         let is_start = line.span().contains(&label.span.start());
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start && margin_label.as_ref().map_or(true, |m| **label as *const _ != m.label as *const _) { // TODO: Check to see whether multi is the first on the start line or first on the end line
