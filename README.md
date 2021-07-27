@@ -44,7 +44,7 @@ you're thinking of using `ariadne` to process your compiler's output, why not tr
 
 ## Stability
 
-The API (should) follow [semver](semver.org/). However, this does not apply to the layout of final error messages. Minor
+The API (should) follow [semver](https://www.semver.org/). However, this does not apply to the layout of final error messages. Minor
 tweaks to the internal layout heuristics can often result in the exact format of error messages changing with labels
 moving slightly. If you experience a change in layout that you believe to be a regression (either the change is
 incorrect, or makes your diagnostics harder to read) then please open an issue.
