@@ -28,10 +28,11 @@ impl<S: Span> Report<S> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
         let mut groups = Vec::new();
         for label in self.labels.iter() {
+            let src_display = cache.display(label.span.source());
             let src = match cache.fetch(label.span.source()) {
                 Ok(src) => src,
                 Err(e) => {
-                    eprintln!("Unable to fetch source {:?}: {:?}", label.span.source(), e);
+                    eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), e);
                     continue;
                 },
             };

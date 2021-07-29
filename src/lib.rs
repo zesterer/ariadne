@@ -54,7 +54,7 @@ use std::{
 /// A trait implemented by spans within a character-based source.
 pub trait Span {
     /// The identifier used to uniquely refer to a source. In most cases, this is the fully-qualified path of the file.
-    type SourceId: fmt::Debug + Hash + PartialEq + Eq + ToOwned;
+    type SourceId: PartialEq + ToOwned + ?Sized;
 
     /// Get the identifier of the source that this span refers to.
     fn source(&self) -> &Self::SourceId;
@@ -170,13 +170,13 @@ pub struct Report<S: Span = Range<usize>> {
 
 impl<S: Span> Report<S> {
     /// Begin building a new [`Report`].
-    pub fn build(kind: ReportKind, src_id: S::SourceId, offset: usize) -> ReportBuilder<S> {
+    pub fn build<Id: Into<<S::SourceId as ToOwned>::Owned>>(kind: ReportKind, src_id: Id, offset: usize) -> ReportBuilder<S> {
         ReportBuilder {
             kind,
             code: None,
             msg: None,
             note: None,
-            location: (src_id.to_owned(), offset),
+            location: (src_id.into(), offset),
             labels: Vec::new(),
             config: Config::default(),
         }
