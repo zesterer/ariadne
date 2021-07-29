@@ -19,6 +19,16 @@ pub trait Cache<Id: ?Sized> {
     fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>>;
 }
 
+impl<'b, C: Cache<Id>, Id> Cache<Id> for &'b mut C {
+    fn fetch(&mut self, id: &Id) -> Result<&Source, Box<dyn fmt::Debug + '_>> { C::fetch(self, id) }
+    fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> { C::display(self, id) }
+}
+
+impl<C: Cache<Id>, Id> Cache<Id> for Box<C> {
+    fn fetch(&mut self, id: &Id) -> Result<&Source, Box<dyn fmt::Debug + '_>> { C::fetch(self, id) }
+    fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> { C::display(self, id) }
+}
+
 /// A type representing a single line of a [`Source`].
 pub struct Line {
     offset: usize,
