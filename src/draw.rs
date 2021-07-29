@@ -73,29 +73,6 @@ impl Characters {
             underline: '^',
         }
     }
-
-    pub fn extended_ascii() -> Self {
-        Self {
-            hbar: '─',
-            vbar: '│',
-            xbar: '┼',
-            vbar_break: '·',
-            uarrow: '^',
-            rarrow: '>',
-            ltop: '┌',
-            mtop: 'v',
-            rtop: '┐',
-            lbot: '└',
-            mbot: '^',
-            rbot: '┘',
-            lbox: '[',
-            rbox: ']',
-            lcross: '├',
-            rcross: '┤',
-            underbar: '^',
-            underline: '^',
-        }
-    }
 }
 
 /// A trait used to add formatting attributes to displayable items.

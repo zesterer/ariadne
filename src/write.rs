@@ -74,7 +74,6 @@ impl<S: Span> Report<S> {
         let draw = match self.config.char_set {
             CharSet::Unicode => draw::Characters::unicode(),
             CharSet::Ascii => draw::Characters::ascii(),
-            CharSet::ExtendedAscii => draw::Characters::extended_ascii(),
         };
 
         // --- Header ---

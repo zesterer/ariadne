@@ -9,9 +9,11 @@ A fancy compiler diagnostics crate.
 
 ## Example
 
-# <img src="misc/example.png" alt="Ariadne supports arbitrary multi-line spans"/>
+<a href = "https://github.com/zesterer/ariadne/blob/main/examples/multiline.rs">
+<img src="https://raw.githubusercontent.com/zesterer/ariadne/main/misc/example.png" alt="Ariadne supports arbitrary multi-line spans"/>
+</a>
 
-See [`examples/`](examples/) for more examples.
+See [`examples/`](https://github.com/zesterer/ariadne/tree/main/examples) for more examples.
 
 ## About
 
@@ -44,10 +46,10 @@ you're thinking of using `ariadne` to process your compiler's output, why not tr
 
 ## Stability
 
-The API (should) follow [semver](https://www.semver.org/). However, this does not apply to the layout of final error messages. Minor
-tweaks to the internal layout heuristics can often result in the exact format of error messages changing with labels
-moving slightly. If you experience a change in layout that you believe to be a regression (either the change is
-incorrect, or makes your diagnostics harder to read) then please open an issue.
+The API (should) follow [semver](https://www.semver.org/). However, this does not apply to the layout of final error
+messages. Minor tweaks to the internal layout heuristics can often result in the exact format of error messages changing
+with labels moving slightly. If you experience a change in layout that you believe to be a regression (either the change
+is incorrect, or makes your diagnostics harder to read) then please open an issue.
 
 ## Credit
 

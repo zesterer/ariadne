@@ -1,33 +1,4 @@
-//! A fancy compiler diagnostics crate.
-//!
-//! # Example
-//!
-//! <img src="https://raw.githubusercontent.com/zesterer/ariadne/main/misc/example.png" alt="Multi-line spans"/>
-//!
-//! # Features
-//!
-//! - Inline and multi-line labels capable of handling arbitrary configurations of spans
-//! - Multi-file errors
-//! - Generic across custom spans and file caches
-//! - A choice of character sets to ensure compatibility
-//! - Coloured labels & highlighting with 256-color support (thanks to [`yansi`](https://github.com/SergioBenitez/yansi))
-//! - Label priority and ordering
-//! - Compact mode for smaller diagnostics
-//! - Correct handling of variable-width characters such as tabs
-//! - A plethora of other options (tab width, label attach points, underlines, etc.)
-//!
-//! ```
-//! use ariadne::{Report, ReportKind, Label, Source};
-//!
-//! Report::build(ReportKind::Error, (), 34)
-//!     .with_message("Incompatible types")
-//!     .with_label(Label::new(32..33).with_message("This is of type Nat"))
-//!     .with_label(Label::new(42..45).with_message("This is of type Str"))
-//!     .finish()
-//!     .print(Source::from(include_str!("../examples/sample.tao")))
-//!     .unwrap();
-//!
-
+#![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 
 mod source;
@@ -299,8 +270,6 @@ pub enum CharSet {
     Unicode,
     /// ASCII-only characters.
     Ascii,
-    /// Extended ASCII characters.
-    ExtendedAscii,
 }
 
 /// A type used to configure a report
