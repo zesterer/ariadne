@@ -56,6 +56,7 @@ impl Line {
 pub struct Source {
     lines: Vec<Line>,
     len: usize,
+    line_offset: usize,
 }
 
 impl<S: AsRef<str>> From<S> for Source {
@@ -79,11 +80,17 @@ impl<S: AsRef<str>> From<S> for Source {
                 })
                 .collect(),
             len: offset,
+            line_offset: 0,
         }
     }
 }
 
 impl Source {
+    /// Add an offset to the line number displayed in the message.
+    pub fn with_line_offset<S: AsRef<str>>(source: S, line_offset: usize) -> Source {
+        Source { line_offset, ..Source::from(source) }
+    }
+
     /// Get the length of the total number of characters in the source.
     pub fn len(&self) -> usize { self.len }
 
@@ -98,17 +105,17 @@ impl Source {
     /// Return an iterator over the [`Line`]s in this source.
     pub fn lines(&self) -> impl ExactSizeIterator<Item = &Line> + '_ { self.lines.iter() }
 
-    /// Get the line that the given offset appears on, and the line/column numbers of the offset.
+    /// Get the line that the given offset appears on, the line/column numbers of the offset, and any offset added to the line number.
     ///
     /// Note that the line/column numbers are zero-indexed.
-    pub fn get_offset_line(&self, offset: usize) -> Option<(&Line, usize, usize)> {
+    pub fn get_offset_line(&self, offset: usize) -> Option<(&Line, usize, usize, usize)> {
         if offset <= self.len {
             let idx = self.lines
                 .binary_search_by_key(&offset, |line| line.offset)
                 .unwrap_or_else(|idx| idx.saturating_sub(1));
             let line = &self.lines[idx];
             assert!(offset >= line.offset, "offset = {}, line.offset = {}", offset, line.offset);
-            Some((line, idx, offset - line.offset))
+            Some((line, idx, offset - line.offset, self.line_offset))
         } else {
             None
         }
@@ -119,8 +126,8 @@ impl Source {
     /// The resulting range is guaranteed to contain valid line indices (i.e: those that can be used for
     /// [`Source::line`]).
     pub fn get_line_range<S: Span>(&self, span: &S) -> Range<usize> {
-        let start = self.get_offset_line(span.start()).map_or(0, |(_, l, _)| l);
-        let end = self.get_offset_line(span.end().saturating_sub(1).max(span.start())).map_or(self.lines.len(), |(_, l, _)| l + 1);
+        let start = self.get_offset_line(span.start()).map_or(0, |(_, l, _, _)| l);
+        let end = self.get_offset_line(span.end().saturating_sub(1).max(span.start())).map_or(self.lines.len(), |(_, l, _, _)| l + 1);
         start..end
     }
 }

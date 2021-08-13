@@ -37,8 +37,8 @@ impl<S: Span> Report<S> {
                 },
             };
 
-            let start_line = src.get_offset_line(label.span.start()).map(|(_, l, _)| l);
-            let end_line = src.get_offset_line(label.span.end().saturating_sub(1).max(label.span.start())).map(|(_, l, _)| l);
+            let start_line = src.get_offset_line(label.span.start()).map(|(_, l, _, _)| l);
+            let end_line = src.get_offset_line(label.span.end().saturating_sub(1).max(label.span.start())).map(|(_, l, _, _)| l);
 
             let label_info = LabelInfo {
                 kind: if start_line == end_line {
@@ -141,7 +141,7 @@ impl<S: Span> Report<S> {
             };
             let (line_no, col_no) = src
                 .get_offset_line(location)
-                .map(|(_, idx, col)| (format!("{}", idx + 1), format!("{}", col + 1)))
+                .map(|(_, idx, col, offs)| (format!("{}", idx + 1 + offs), format!("{}", col + 1)))
                 .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
             let line_ref = format!(":{}:{}", line_no, col_no);
             writeln!(
