@@ -197,6 +197,7 @@ impl fmt::Display for ReportKind {
 }
 
 /// A type used to build a [`Report`].
+#[derive(Clone)]
 pub struct ReportBuilder<S: Span> {
     kind: ReportKind,
     code: Option<u32>,
