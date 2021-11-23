@@ -67,11 +67,11 @@ impl<S: AsRef<str>> From<S> for Source {
         Self {
             lines: s
                 .as_ref()
-                .lines()
+                .split_terminator('\n') // TODO: Handle non-\n newlines
                 .map(|line| {
                     let l = Line {
                         offset,
-                        len: line.chars().count() + 1, // TODO: Don't assume all newlines are a single character!
+                        len: line.chars().count() + 1,
                         chars: line.trim_end().to_owned(),
                     };
                     offset += l.len;
