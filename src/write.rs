@@ -539,6 +539,16 @@ impl<S: Span> Report<S> {
                 write!(w, "{}: {}\n", "Note".fg(self.config.note_color()), note)?;
             }
 
+            // Help
+            if let (Some(note), true) = (&self.help, is_final_group) {
+                if !self.config.compact {
+                    write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
+                    write!(w, "\n")?;
+                }
+                write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
+                write!(w, "{}: {}\n", "Help".fg(self.config.note_color()), note)?;
+            }
+
             // Tail of report
             if !self.config.compact {
                 if is_final_group {

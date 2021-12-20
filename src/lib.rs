@@ -134,6 +134,7 @@ pub struct Report<S: Span = Range<usize>> {
     code: Option<u32>,
     msg: Option<String>,
     note: Option<String>,
+    help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
     config: Config,
@@ -147,6 +148,7 @@ impl<S: Span> Report<S> {
             code: None,
             msg: None,
             note: None,
+            help: None,
             location: (src_id.into(), offset),
             labels: Vec::new(),
             config: Config::default(),
@@ -202,6 +204,7 @@ pub struct ReportBuilder<S: Span> {
     code: Option<u32>,
     msg: Option<String>,
     note: Option<String>,
+    help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
     config: Config,
@@ -226,6 +229,12 @@ impl<S: Span> ReportBuilder<S> {
         self
     }
 
+    /// Give the diagnostic a help message.
+    pub fn with_help<N: ToString>(mut self, note: N) -> Self {
+        self.help = Some(note.to_string());
+        self
+    }
+
     /// Add a new label to the diagnostic.
     pub fn with_label(mut self, label: Label<S>) -> Self {
         self.labels.push(label);
@@ -245,6 +254,7 @@ impl<S: Span> ReportBuilder<S> {
             code: self.code,
             msg: self.msg,
             note: self.note,
+            help: self.help,
             location: self.location,
             labels: self.labels,
             config: self.config,
