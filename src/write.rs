@@ -529,16 +529,6 @@ impl<S: Span> Report<S> {
 
             let is_final_group = group_idx + 1 == groups_len;
 
-            // Note
-            if let (Some(note), true) = (&self.note, is_final_group) {
-                if !self.config.compact {
-                    write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
-                    write!(w, "\n")?;
-                }
-                write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
-                write!(w, "{}: {}\n", "Note".fg(self.config.note_color()), note)?;
-            }
-
             // Help
             if let (Some(note), true) = (&self.help, is_final_group) {
                 if !self.config.compact {
@@ -548,7 +538,17 @@ impl<S: Span> Report<S> {
                 write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
                 write!(w, "{}: {}\n", "Help".fg(self.config.note_color()), note)?;
             }
-
+            
+            // Note
+            if let (Some(note), true) = (&self.note, is_final_group) {
+                if !self.config.compact {
+                    write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
+                    write!(w, "\n")?;
+                }
+                write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
+                write!(w, "{}: {}\n", "Note".fg(self.config.note_color()), note)?;
+            }
+            
             // Tail of report
             if !self.config.compact {
                 if is_final_group {
