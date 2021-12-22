@@ -389,7 +389,7 @@ impl<S: Span> Report<S> {
                     .fold(0, |l, ll| if ll.multi {
                         line.len()
                     } else {
-                        l.max(ll.label.span.end() - line.offset())
+                        l.max(ll.label.span.end().saturating_sub(line.offset()))
                     }) + arrow_end_space;
 
                 // Should we draw a vertical bar as part of a label arrow on this line?
