@@ -1,25 +1,25 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 
-mod source;
 mod display;
 mod draw;
+mod source;
 mod write;
 
 pub use crate::{
-    source::{Line, Source, Cache, FileCache, FnCache, sources},
-    draw::{Fmt, ColorGenerator},
+    draw::{ColorGenerator, Fmt},
+    source::{sources, Cache, FileCache, FnCache, Line, Source},
 };
 pub use yansi::Color;
 
 use crate::display::*;
 use std::{
     borrow::Borrow,
-    ops::Range,
-    io::{self, Write},
-    hash::Hash,
-    cmp::{PartialEq, Eq},
+    cmp::{Eq, PartialEq},
     fmt,
+    hash::Hash,
+    io::{self, Write},
+    ops::Range,
 };
 
 /// A trait implemented by spans within a character-based source.
@@ -43,26 +43,42 @@ pub trait Span {
     fn end(&self) -> usize;
 
     /// Get the length of this span (difference between the start of the span and the end of the span).
-    fn len(&self) -> usize { self.end().saturating_sub(self.start()) }
+    fn len(&self) -> usize {
+        self.end().saturating_sub(self.start())
+    }
 
     /// Determine whether the span contains the given offset.
-    fn contains(&self, offset: usize) -> bool { (self.start()..self.end()).contains(&offset) }
+    fn contains(&self, offset: usize) -> bool {
+        (self.start()..self.end()).contains(&offset)
+    }
 }
 
 impl Span for Range<usize> {
     type SourceId = ();
 
-    fn source(&self) -> &Self::SourceId { &() }
-    fn start(&self) -> usize { self.start }
-    fn end(&self) -> usize { self.end }
+    fn source(&self) -> &Self::SourceId {
+        &()
+    }
+    fn start(&self) -> usize {
+        self.start
+    }
+    fn end(&self) -> usize {
+        self.end
+    }
 }
 
 impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, Range<usize>) {
     type SourceId = Id;
 
-    fn source(&self) -> &Self::SourceId { &self.0 }
-    fn start(&self) -> usize { self.1.start }
-    fn end(&self) -> usize { self.1.end }
+    fn source(&self) -> &Self::SourceId {
+        &self.0
+    }
+    fn start(&self) -> usize {
+        self.1.start
+    }
+    fn end(&self) -> usize {
+        self.1.end
+    }
 }
 
 /// A type that represents a labelled section of source code.
@@ -142,7 +158,11 @@ pub struct Report<S: Span = Range<usize>> {
 
 impl<S: Span> Report<S> {
     /// Begin building a new [`Report`].
-    pub fn build<Id: Into<<S::SourceId as ToOwned>::Owned>>(kind: ReportKind, src_id: Id, offset: usize) -> ReportBuilder<S> {
+    pub fn build<Id: Into<<S::SourceId as ToOwned>::Owned>>(
+        kind: ReportKind,
+        src_id: Id,
+        offset: usize,
+    ) -> ReportBuilder<S> {
         ReportBuilder {
             kind,
             code: None,
@@ -301,42 +321,78 @@ impl Config {
     /// The alternative to this is to insert crossing characters. However, these interact poorly with label colours.
     ///
     /// If unspecified, this defaults to [`false`].
-    pub fn with_cross_gap(mut self, cross_gap: bool) -> Self { self.cross_gap = cross_gap; self }
+    pub fn with_cross_gap(mut self, cross_gap: bool) -> Self {
+        self.cross_gap = cross_gap;
+        self
+    }
     /// Where should inline labels attach to their spans?
     ///
     /// If unspecified, this defaults to [`LabelAttach::Middle`].
-    pub fn with_label_attach(mut self, label_attach: LabelAttach) -> Self { self.label_attach = label_attach; self }
+    pub fn with_label_attach(mut self, label_attach: LabelAttach) -> Self {
+        self.label_attach = label_attach;
+        self
+    }
     /// Should the report remove gaps to minimise used space?
     ///
     /// If unspecified, this defaults to [`false`].
-    pub fn with_compact(mut self, compact: bool) -> Self { self.compact = compact; self }
+    pub fn with_compact(mut self, compact: bool) -> Self {
+        self.compact = compact;
+        self
+    }
     /// Should underlines be used for label span where possible?
     ///
     /// If unspecified, this defaults to [`true`].
-    pub fn with_underlines(mut self, underlines: bool) -> Self { self.underlines = underlines; self }
+    pub fn with_underlines(mut self, underlines: bool) -> Self {
+        self.underlines = underlines;
+        self
+    }
     /// Should arrows be used to point to the bounds of multi-line spans?
     ///
     /// If unspecified, this defaults to [`true`].
-    pub fn with_multiline_arrows(mut self, multiline_arrows: bool) -> Self { self.multiline_arrows = multiline_arrows; self }
+    pub fn with_multiline_arrows(mut self, multiline_arrows: bool) -> Self {
+        self.multiline_arrows = multiline_arrows;
+        self
+    }
     /// Should colored output should be enabled?
     ///
     /// If unspecified, this defaults to [`true`].
-    pub fn with_color(mut self, color: bool) -> Self { self.color = color; self }
+    pub fn with_color(mut self, color: bool) -> Self {
+        self.color = color;
+        self
+    }
     /// How many characters width should tab characters be?
     ///
     /// If unspecified, this defaults to `4`.
-    pub fn with_tab_width(mut self, tab_width: usize) -> Self { self.tab_width = tab_width; self }
+    pub fn with_tab_width(mut self, tab_width: usize) -> Self {
+        self.tab_width = tab_width;
+        self
+    }
     /// What character set should be used to display dynamic elements such as boxes and arrows?
     ///
     /// If unspecified, this defaults to [`CharSet::Unicode`].
-    pub fn with_char_set(mut self, char_set: CharSet) -> Self { self.char_set = char_set; self }
+    pub fn with_char_set(mut self, char_set: CharSet) -> Self {
+        self.char_set = char_set;
+        self
+    }
 
-    fn error_color(&self) -> Option<Color> { Some(Color::Red).filter(|_| self.color) }
-    fn warning_color(&self) -> Option<Color> { Some(Color::Yellow).filter(|_| self.color) }
-    fn advice_color(&self) -> Option<Color> { Some(Color::Fixed(147)).filter(|_| self.color) }
-    fn margin_color(&self) -> Option<Color> { Some(Color::Fixed(246)).filter(|_| self.color) }
-    fn unimportant_color(&self) -> Option<Color> { Some(Color::Fixed(249)).filter(|_| self.color) }
-    fn note_color(&self) -> Option<Color> { Some(Color::Fixed(115)).filter(|_| self.color) }
+    fn error_color(&self) -> Option<Color> {
+        Some(Color::Red).filter(|_| self.color)
+    }
+    fn warning_color(&self) -> Option<Color> {
+        Some(Color::Yellow).filter(|_| self.color)
+    }
+    fn advice_color(&self) -> Option<Color> {
+        Some(Color::Fixed(147)).filter(|_| self.color)
+    }
+    fn margin_color(&self) -> Option<Color> {
+        Some(Color::Fixed(246)).filter(|_| self.color)
+    }
+    fn unimportant_color(&self) -> Option<Color> {
+        Some(Color::Fixed(249)).filter(|_| self.color)
+    }
+    fn note_color(&self) -> Option<Color> {
+        Some(Color::Fixed(115)).filter(|_| self.color)
+    }
 
     // Find the character that should be drawn and the number of times it should be drawn for each char
     fn char_width(&self, c: char, col: usize) -> (char, usize) {
@@ -344,8 +400,8 @@ impl Config {
             '\t' => {
                 // Find the column that the tab should end at
                 let tab_end = (col / self.tab_width + 1) * self.tab_width;
-                (' ',  tab_end - col)
-            },
+                (' ', tab_end - col)
+            }
             _ => (c, 1),
         }
     }

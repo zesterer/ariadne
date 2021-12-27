@@ -1,4 +1,4 @@
-use ariadne::{Report, ReportKind, Label, Source};
+use ariadne::{Label, Report, ReportKind, Source};
 
 fn main() {
     Report::build(ReportKind::Error, (), 34)

@@ -34,11 +34,13 @@ impl<S: Span> Report<S> {
                 Err(e) => {
                     eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), e);
                     continue;
-                },
+                }
             };
 
             let start_line = src.get_offset_line(label.span.start()).map(|(_, l, _)| l);
-            let end_line = src.get_offset_line(label.span.end().saturating_sub(1).max(label.span.start())).map(|(_, l, _)| l);
+            let end_line = src
+                .get_offset_line(label.span.end().saturating_sub(1).max(label.span.start()))
+                .map(|(_, l, _)| l);
 
             let label_info = LabelInfo {
                 kind: if start_line == end_line {
@@ -78,7 +80,9 @@ impl<S: Span> Report<S> {
 
         // --- Header ---
 
-        let code = self.code.map(|c| format!("[{}{:02}] ", self.kind.letter(), c));
+        let code = self
+            .code
+            .map(|c| format!("[{}{:02}] ", self.kind.letter(), c));
         let id = format!("{}{}:", Show(code), self.kind);
         let kind_color = match self.kind {
             ReportKind::Error => self.config.error_color(),
@@ -103,21 +107,32 @@ impl<S: Span> Report<S> {
                     Err(e) => {
                         eprintln!("Unable to fetch source {}: {:?}", src_name, e);
                         return None;
-                    },
+                    }
                 };
 
                 let line_range = src.get_line_range(span);
-                Some((1..)
-                    .map(|x| 10u32.pow(x))
-                    .take_while(|x| line_range.end as u32 / x != 0)
-                    .count() + 1)
+                Some(
+                    (1..)
+                        .map(|x| 10u32.pow(x))
+                        .take_while(|x| line_range.end as u32 / x != 0)
+                        .count()
+                        + 1,
+                )
             })
             .max()
             .unwrap_or(0);
 
         // --- Source sections ---
         let groups_len = groups.len();
-        for (group_idx, SourceGroup { src_id, span, labels }) in groups.into_iter().enumerate() {
+        for (
+            group_idx,
+            SourceGroup {
+                src_id,
+                span,
+                labels,
+            },
+        ) in groups.into_iter().enumerate()
+        {
             let src_name = cache
                 .display(src_id)
                 .map(|d| d.to_string())
@@ -128,7 +143,7 @@ impl<S: Span> Report<S> {
                 Err(e) => {
                     eprintln!("Unable to fetch source {}: {:?}", src_name, e);
                     continue;
-                },
+                }
             };
 
             let line_range = src.get_line_range(&span);
@@ -148,7 +163,12 @@ impl<S: Span> Report<S> {
                 w,
                 "{}{}{}{}{}{}{}",
                 Show((' ', line_no_width + 2)),
-                if group_idx == 0 { draw.ltop } else { draw.lcross }.fg(self.config.margin_color()),
+                if group_idx == 0 {
+                    draw.ltop
+                } else {
+                    draw.lcross
+                }
+                .fg(self.config.margin_color()),
                 draw.hbar.fg(self.config.margin_color()),
                 draw.lbox.fg(self.config.margin_color()),
                 src_name,
@@ -157,7 +177,12 @@ impl<S: Span> Report<S> {
             )?;
 
             if !self.config.compact {
-                writeln!(w, "{}{}", Show((' ', line_no_width + 2)), draw.vbar.fg(self.config.margin_color()))?;
+                writeln!(
+                    w,
+                    "{}{}",
+                    Show((' ', line_no_width + 2)),
+                    draw.vbar.fg(self.config.margin_color())
+                )?;
             }
 
             struct LineLabel<'a, S> {
@@ -178,13 +203,13 @@ impl<S: Span> Report<S> {
             // Sort multiline labels by length
             multi_labels.sort_by_key(|m| -(m.span.len() as isize));
 
-            let write_margin = |
-                w: &mut W, idx: usize,
-                is_line: bool,
-                report_row: Option<(usize, bool)>,
-                line_labels: &[LineLabel<S>],
-                margin_label: &Option<LineLabel<S>>
-            | -> std::io::Result<()> {
+            let write_margin = |w: &mut W,
+                                idx: usize,
+                                is_line: bool,
+                                report_row: Option<(usize, bool)>,
+                                line_labels: &[LineLabel<S>],
+                                margin_label: &Option<LineLabel<S>>|
+             -> std::io::Result<()> {
                 let line_no_margin = if is_line {
                     let line_no = format!("{}", idx + 1);
                     format!(
@@ -214,12 +239,16 @@ impl<S: Span> Report<S> {
                     let multi_label = multi_labels.get(col);
                     let line_span = src.line(idx).unwrap().span();
 
-                    for (i, label) in multi_labels[0..(col + 1).min(multi_labels.len())].iter().enumerate() {
+                    for (i, label) in multi_labels[0..(col + 1).min(multi_labels.len())]
+                        .iter()
+                        .enumerate()
+                    {
                         let margin = margin_label
                             .as_ref()
                             .filter(|m| **label as *const _ == m.label as *const _);
 
-                        if label.span.start() <= line_span.end && label.span.end() > line_span.start {
+                        if label.span.start() <= line_span.end && label.span.end() > line_span.start
+                        {
                             let is_parent = i != col;
                             let is_start = line_span.contains(&label.span.start());
                             let is_end = line_span.contains(&label.last_offset());
@@ -237,7 +266,9 @@ impl<S: Span> Report<S> {
                                 if report_row == label_row {
                                     if let Some(margin) = margin {
                                         vbar = Some(&margin.label).filter(|_| col == i);
-                                        if is_start { continue; }
+                                        if is_start {
+                                            continue;
+                                        }
                                     }
 
                                     if is_arrow {
@@ -249,46 +280,61 @@ impl<S: Span> Report<S> {
                                         vbar = vbar.or(Some(*label).filter(|_| !is_parent));
                                     }
                                 } else {
-                                    vbar = vbar.or(Some(*label).filter(|_| !is_parent && (is_start ^ (report_row < label_row))));
+                                    vbar = vbar.or(Some(*label).filter(|_| {
+                                        !is_parent && (is_start ^ (report_row < label_row))
+                                    }));
                                 }
                             }
                         }
                     }
 
                     if let (Some((margin, _is_start)), true) = (margin_ptr, is_line) {
-                        let is_col = multi_label.map_or(false, |ml| **ml as *const _ == margin.label as *const _);
+                        let is_col = multi_label
+                            .map_or(false, |ml| **ml as *const _ == margin.label as *const _);
                         let is_limit = col + 1 == multi_labels.len();
                         if !is_col && !is_limit {
                             hbar = hbar.or(Some(margin.label));
                         }
                     }
 
-                    hbar = hbar.filter(|l| margin_label.as_ref().map_or(true, |margin| margin.label as *const _ != *l as *const _) || !is_line);
+                    hbar = hbar.filter(|l| {
+                        margin_label
+                            .as_ref()
+                            .map_or(true, |margin| margin.label as *const _ != *l as *const _)
+                            || !is_line
+                    });
 
                     let (a, b) = if let Some((label, is_start)) = corner {
-                        (if is_start { draw.ltop } else { draw.lbot }.fg(label.color), draw.hbar.fg(label.color))
-                    } else if let Some(label) = hbar.filter(|_| vbar.is_some() && !self.config.cross_gap) {
+                        (
+                            if is_start { draw.ltop } else { draw.lbot }.fg(label.color),
+                            draw.hbar.fg(label.color),
+                        )
+                    } else if let Some(label) =
+                        hbar.filter(|_| vbar.is_some() && !self.config.cross_gap)
+                    {
                         (draw.xbar.fg(label.color), draw.hbar.fg(label.color))
                     } else if let Some(label) = hbar {
                         (draw.hbar.fg(label.color), draw.hbar.fg(label.color))
                     } else if let Some(label) = vbar {
                         (draw.vbar.fg(label.color), ' '.fg(None))
                     } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
-                        let is_col = multi_label.map_or(false, |ml| **ml as *const _ == margin.label as *const _);
+                        let is_col = multi_label
+                            .map_or(false, |ml| **ml as *const _ == margin.label as *const _);
                         let is_limit = col == multi_labels.len();
                         (
                             if is_limit {
                                 draw.rarrow
                             } else if is_col {
-                                if is_start { draw.ltop } else { draw.lcross }
+                                if is_start {
+                                    draw.ltop
+                                } else {
+                                    draw.lcross
+                                }
                             } else {
                                 draw.hbar
-                            }.fg(margin.label.color),
-                            if !is_limit {
-                                draw.hbar
-                            } else {
-                                ' '
-                            }.fg(margin.label.color),
+                            }
+                            .fg(margin.label.color),
+                            if !is_limit { draw.hbar } else { ' ' }.fg(margin.label.color),
                         )
                     } else {
                         (' '.fg(None), ' '.fg(None))
@@ -311,7 +357,8 @@ impl<S: Span> Report<S> {
                     .filter_map(|(_i, label)| {
                         let is_start = line.span().contains(&label.span.start());
                         let is_end = line.span().contains(&label.last_offset());
-                        if is_start { // TODO: Check to see whether multi is the first on the start line or first on the end line
+                        if is_start {
+                            // TODO: Check to see whether multi is the first on the start line or first on the end line
                             Some(LineLabel {
                                 col: label.span.start() - line.offset(),
                                 label: **label,
@@ -338,7 +385,12 @@ impl<S: Span> Report<S> {
                     .filter_map(|(_i, label)| {
                         let is_start = line.span().contains(&label.span.start());
                         let is_end = line.span().contains(&label.last_offset());
-                        if is_start && margin_label.as_ref().map_or(true, |m| **label as *const _ != m.label as *const _) { // TODO: Check to see whether multi is the first on the start line or first on the end line
+                        if is_start
+                            && margin_label
+                                .as_ref()
+                                .map_or(true, |m| **label as *const _ != m.label as *const _)
+                        {
+                            // TODO: Check to see whether multi is the first on the start line or first on the end line
                             Some(LineLabel {
                                 col: label.span.start() - line.offset(),
                                 label: **label,
@@ -358,15 +410,18 @@ impl<S: Span> Report<S> {
                     })
                     .collect::<Vec<_>>();
 
-                for label_info in labels
-                    .iter()
-                    .filter(|l| l.label.span.start() >= line.span().start && l.label.span.end() <= line.span().end)
-                {
+                for label_info in labels.iter().filter(|l| {
+                    l.label.span.start() >= line.span().start
+                        && l.label.span.end() <= line.span().end
+                }) {
                     if matches!(label_info.kind, LabelKind::Inline) {
                         line_labels.push(LineLabel {
                             col: match &self.config.label_attach {
                                 LabelAttach::Start => label_info.label.span.start(),
-                                LabelAttach::Middle => (label_info.label.span.start() + label_info.label.span.end()) / 2,
+                                LabelAttach::Middle => {
+                                    (label_info.label.span.start() + label_info.label.span.end())
+                                        / 2
+                                }
                                 LabelAttach::End => label_info.label.last_offset(),
                             } - line.offset(),
                             label: label_info.label,
@@ -377,47 +432,64 @@ impl<S: Span> Report<S> {
                 }
 
                 // Skip this line if we don't have labels for it
-                if line_labels.len() == 0 && margin_label.is_none() { continue; }
+                if line_labels.len() == 0 && margin_label.is_none() {
+                    continue;
+                }
 
                 // Sort the labels by their columns
                 line_labels.sort_by_key(|ll| (ll.label.order, ll.col, !ll.label.span.start()));
 
                 // Determine label bounds so we know where to put error messages
                 let arrow_end_space = if self.config.compact { 1 } else { 2 };
-                let arrow_len = line_labels
-                    .iter()
-                    .fold(0, |l, ll| if ll.multi {
+                let arrow_len = line_labels.iter().fold(0, |l, ll| {
+                    if ll.multi {
                         line.len()
                     } else {
                         l.max(ll.label.span.end().saturating_sub(line.offset()))
-                    }) + arrow_end_space;
+                    }
+                }) + arrow_end_space;
 
                 // Should we draw a vertical bar as part of a label arrow on this line?
-                let get_vbar = |col, row| line_labels
-                    .iter()
-                    // Only labels with notes get an arrow
-                    .enumerate()
-                    .filter(|(_, ll)| ll.label.msg.is_some() && margin_label.as_ref().map_or(true, |m| ll.label as *const _ != m.label as *const _))
-                    .find(|(j, ll)| ll.col == col && ((row <= *j && !ll.multi) || (row <= *j && ll.multi)))
-                    .map(|(_, ll)| ll);
+                let get_vbar = |col, row| {
+                    line_labels
+                        .iter()
+                        // Only labels with notes get an arrow
+                        .enumerate()
+                        .filter(|(_, ll)| {
+                            ll.label.msg.is_some()
+                                && margin_label
+                                    .as_ref()
+                                    .map_or(true, |m| ll.label as *const _ != m.label as *const _)
+                        })
+                        .find(|(j, ll)| {
+                            ll.col == col && ((row <= *j && !ll.multi) || (row <= *j && ll.multi))
+                        })
+                        .map(|(_, ll)| ll)
+                };
 
-                let get_highlight = |col| margin_label
-                    .iter()
-                    .map(|ll| ll.label)
-                    .chain(multi_labels.iter().map(|l| **l))
-                    .chain(line_labels.iter().map(|l| l.label))
-                    .filter(|l| l.span.contains(line.offset() + col))
-                    // Prioritise displaying smaller spans
-                    .min_by_key(|l| (-l.priority, l.span.len()));
+                let get_highlight = |col| {
+                    margin_label
+                        .iter()
+                        .map(|ll| ll.label)
+                        .chain(multi_labels.iter().map(|l| **l))
+                        .chain(line_labels.iter().map(|l| l.label))
+                        .filter(|l| l.span.contains(line.offset() + col))
+                        // Prioritise displaying smaller spans
+                        .min_by_key(|l| (-l.priority, l.span.len()))
+                };
 
-                let get_underline = |col| line_labels
-                    .iter()
-                    .filter(|ll| self.config.underlines
+                let get_underline = |col| {
+                    line_labels
+                        .iter()
+                        .filter(|ll| {
+                            self.config.underlines
                         // Underlines only occur for inline spans (highlighting can occur for all spans)
                         && !ll.multi
-                        && ll.label.span.contains(line.offset() + col))
-                    // Prioritise displaying smaller spans
-                    .min_by_key(|ll| (-ll.label.priority, ll.label.span.len()));
+                        && ll.label.span.contains(line.offset() + col)
+                        })
+                        // Prioritise displaying smaller spans
+                        .min_by_key(|ll| (-ll.label.priority, ll.label.span.len()))
+                };
 
                 // Margin
                 write_margin(&mut w, idx, true, None, &line_labels, &margin_label)?;
@@ -442,11 +514,19 @@ impl<S: Span> Report<S> {
 
                     if !self.config.compact {
                         // Margin alternate
-                        write_margin(&mut w, idx, false, Some((row, false)), &line_labels, &margin_label)?;
+                        write_margin(
+                            &mut w,
+                            idx,
+                            false,
+                            Some((row, false)),
+                            &line_labels,
+                            &margin_label,
+                        )?;
                         // Lines alternate
                         let mut chars = line.chars();
                         for col in 0..arrow_len {
-                            let width = chars.next().map_or(1, |c| self.config.char_width(c, col).1);
+                            let width =
+                                chars.next().map_or(1, |c| self.config.char_width(c, col).1);
 
                             let vbar = get_vbar(col, row);
                             let underline = get_underline(col).filter(|_| row == 0);
@@ -462,7 +542,8 @@ impl<S: Span> Report<S> {
                                     } else {
                                         [draw.underbar, draw.underline]
                                     }
-                                } else if vbar_ll.multi && row == 0 && self.config.multiline_arrows {
+                                } else if vbar_ll.multi && row == 0 && self.config.multiline_arrows
+                                {
                                     [draw.uarrow, ' ']
                                 } else {
                                     [draw.vbar, ' ']
@@ -482,28 +563,59 @@ impl<S: Span> Report<S> {
                     }
 
                     // Margin
-                    write_margin(&mut w, idx, false, Some((row, true)), &line_labels, &margin_label)?;
+                    write_margin(
+                        &mut w,
+                        idx,
+                        false,
+                        Some((row, true)),
+                        &line_labels,
+                        &margin_label,
+                    )?;
                     // Lines
                     let mut chars = line.chars();
                     for col in 0..arrow_len {
                         let width = chars.next().map_or(1, |c| self.config.char_width(c, col).1);
 
                         let is_hbar = ((col > line_label.col) ^ line_label.multi)
-                            || (line_label.label.msg.is_some() && line_label.draw_msg && col > line_label.col);
-                        let [c, tail] = if col == line_label.col && line_label.label.msg.is_some() && margin_label.as_ref().map_or(true, |m| line_label.label as *const _ != m.label as *const _) {
-                            [if line_label.multi {
-                                if line_label.draw_msg { draw.mbot } else { draw.rbot }
-                            } else {
-                                draw.lbot
-                            }.fg(line_label.label.color), draw.hbar.fg(line_label.label.color)]
-                        } else if let Some(vbar_ll) = get_vbar(col, row).filter(|_| (col != line_label.col || line_label.label.msg.is_some())) {
+                            || (line_label.label.msg.is_some()
+                                && line_label.draw_msg
+                                && col > line_label.col);
+                        let [c, tail] = if col == line_label.col
+                            && line_label.label.msg.is_some()
+                            && margin_label.as_ref().map_or(true, |m| {
+                                line_label.label as *const _ != m.label as *const _
+                            }) {
+                            [
+                                if line_label.multi {
+                                    if line_label.draw_msg {
+                                        draw.mbot
+                                    } else {
+                                        draw.rbot
+                                    }
+                                } else {
+                                    draw.lbot
+                                }
+                                .fg(line_label.label.color),
+                                draw.hbar.fg(line_label.label.color),
+                            ]
+                        } else if let Some(vbar_ll) = get_vbar(col, row)
+                            .filter(|_| (col != line_label.col || line_label.label.msg.is_some()))
+                        {
                             if !self.config.cross_gap && is_hbar {
-                                [draw.xbar.fg(line_label.label.color), ' '.fg(line_label.label.color)]
+                                [
+                                    draw.xbar.fg(line_label.label.color),
+                                    ' '.fg(line_label.label.color),
+                                ]
                             } else if is_hbar {
                                 [draw.hbar.fg(line_label.label.color); 2]
                             } else {
                                 [
-                                    if vbar_ll.multi && row == 0 && self.config.compact { draw.uarrow } else { draw.vbar }.fg(vbar_ll.label.color),
+                                    if vbar_ll.multi && row == 0 && self.config.compact {
+                                        draw.uarrow
+                                    } else {
+                                        draw.vbar
+                                    }
+                                    .fg(vbar_ll.label.color),
                                     ' '.fg(line_label.label.color),
                                 ]
                             }
@@ -538,7 +650,7 @@ impl<S: Span> Report<S> {
                 write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
                 write!(w, "{}: {}\n", "Help".fg(self.config.note_color()), note)?;
             }
-            
+
             // Note
             if let (Some(note), true) = (&self.note, is_final_group) {
                 if !self.config.compact {
@@ -548,14 +660,20 @@ impl<S: Span> Report<S> {
                 write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
                 write!(w, "{}: {}\n", "Note".fg(self.config.note_color()), note)?;
             }
-            
+
             // Tail of report
             if !self.config.compact {
                 if is_final_group {
-                    let final_margin = format!("{}{}", Show((draw.hbar, line_no_width + 2)), draw.rbot);
+                    let final_margin =
+                        format!("{}{}", Show((draw.hbar, line_no_width + 2)), draw.rbot);
                     writeln!(w, "{}", final_margin.fg(self.config.margin_color()))?;
                 } else {
-                    writeln!(w, "{}{}", Show((' ', line_no_width + 2)), draw.vbar.fg(self.config.margin_color()))?;
+                    writeln!(
+                        w,
+                        "{}{}",
+                        Show((' ', line_no_width + 2)),
+                        draw.vbar.fg(self.config.margin_color())
+                    )?;
                 }
             }
         }
