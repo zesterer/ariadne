@@ -78,7 +78,7 @@ impl<S: Span> Report<S> {
 
         // --- Header ---
 
-        let code = self.code.map(|c| format!("[{}{:02}] ", self.kind.letter(), c));
+        let code = self.code.as_ref().map(|c| format!("[{}] ", c));
         let id = format!("{}{}:", Show(code), self.kind);
         let kind_color = match self.kind {
             ReportKind::Error => self.config.error_color(),
@@ -538,7 +538,7 @@ impl<S: Span> Report<S> {
                 write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
                 write!(w, "{}: {}\n", "Help".fg(self.config.note_color()), note)?;
             }
-            
+
             // Note
             if let (Some(note), true) = (&self.note, is_final_group) {
                 if !self.config.compact {
@@ -548,7 +548,7 @@ impl<S: Span> Report<S> {
                 write_margin(&mut w, 0, false, Some((0, false)), &[], &None)?;
                 write!(w, "{}: {}\n", "Note".fg(self.config.note_color()), note)?;
             }
-            
+
             // Tail of report
             if !self.config.compact {
                 if is_final_group {

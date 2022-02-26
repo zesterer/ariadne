@@ -131,7 +131,7 @@ impl<S> Label<S> {
 /// A type representing a diagnostic that is ready to be written to output.
 pub struct Report<S: Span = Range<usize>> {
     kind: ReportKind,
-    code: Option<u32>,
+    code: Option<String>,
     msg: Option<String>,
     note: Option<String>,
     help: Option<String>,
@@ -201,7 +201,7 @@ impl fmt::Display for ReportKind {
 /// A type used to build a [`Report`].
 pub struct ReportBuilder<S: Span> {
     kind: ReportKind,
-    code: Option<u32>,
+    code: Option<String>,
     msg: Option<String>,
     note: Option<String>,
     help: Option<String>,
@@ -212,32 +212,57 @@ pub struct ReportBuilder<S: Span> {
 
 impl<S: Span> ReportBuilder<S> {
     /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
-    pub fn with_code(mut self, code: u32) -> Self {
-        self.code = Some(code);
+    pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
+        self.code = Some(format!("{:02}", code));
         self
     }
 
-    /// Give this report a message.
+    /// Set the message of this report.
+    pub fn set_message<M: ToString>(&mut self, msg: M) {
+        self.msg = Some(msg.to_string());
+    }
+
+    /// Add a message to this report.
     pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
         self.msg = Some(msg.to_string());
         self
     }
 
-    /// Give the diagnostic a final note.
-    pub fn with_note<N: ToString>(mut self, note: N) -> Self {
+    /// Set the note of this report.
+    pub fn set_note<N: ToString>(&mut self, note: N) {
         self.note = Some(note.to_string());
+    }
+
+    /// Set the note of this report.
+    pub fn with_note<N: ToString>(mut self, note: N) -> Self {
+        self.set_note(note);
         self
     }
 
-    /// Give the diagnostic a help message.
-    pub fn with_help<N: ToString>(mut self, note: N) -> Self {
+    /// Set the help message of this report.
+    pub fn set_help<N: ToString>(&mut self, note: N) {
         self.help = Some(note.to_string());
+    }
+
+    /// Set the help message of this report.
+    pub fn with_help<N: ToString>(mut self, note: N) -> Self {
+        self.set_help(note);
         self
     }
 
-    /// Add a new label to the diagnostic.
-    pub fn with_label(mut self, label: Label<S>) -> Self {
+    /// Add a label to the report.
+    pub fn add_label(&mut self, label: Label<S>) {
         self.labels.push(label);
+    }
+
+    /// Add multiple labels to the report.
+    pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) {
+        self.labels.extend(labels);
+    }
+
+    /// Add a label to the report.
+    pub fn with_label(mut self, label: Label<S>) -> Self {
+        self.add_label(label);
         self
     }
 
