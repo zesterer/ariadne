@@ -132,7 +132,7 @@ impl<S: Span> Report<S> {
                 },
             };
 
-            let mut line_range = src.get_line_range(&span);
+            let line_range = src.get_line_range(&span);
 
             // File name & reference
             let location = if src_id == self.location.0.borrow() {
@@ -394,10 +394,11 @@ impl<S: Span> Report<S> {
                     if !is_ellipsis && within_label {
                         is_ellipsis = true;
                     } else {
-                        if !self.config.compact {
+                        if !self.config.compact && !is_ellipsis {
                             write_margin(&mut w, idx, false, is_ellipsis, false, None, &[], &None)?;
                             write!(w, "\n")?;
                         }
+                        is_ellipsis = true;
                         continue;
                     }
                 } else {
