@@ -180,21 +180,18 @@ pub enum ReportKind {
     Warning,
     /// The report is advice to the user about a potential anti-pattern of other benign issues.
     Advice,
-}
-
-impl ReportKind {
-    fn letter(&self) -> char {
-        match self {
-            Self::Error => 'E',
-            Self::Warning => 'W',
-            Self::Advice => 'A',
-        }
-    }
+    /// The report is of a kind not built into Ariadne.
+    Custom(&'static str, Color),
 }
 
 impl fmt::Display for ReportKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            ReportKind::Error => write!(f, "Error"),
+            ReportKind::Warning => write!(f, "Warning"),
+            ReportKind::Advice => write!(f, "Advice"),
+            ReportKind::Custom(s, _) => write!(f, "{}", s),
+        }
     }
 }
 
@@ -371,6 +368,7 @@ impl Config {
                 let tab_end = (col / self.tab_width + 1) * self.tab_width;
                 (' ',  tab_end - col)
             },
+            c if c.is_whitespace() => (' ', 1),
             _ => (c, 1),
         }
     }

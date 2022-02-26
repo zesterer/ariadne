@@ -30,6 +30,12 @@ fn main() {
                 "definition".fg(out2),
             ))
             .with_color(out2))
+        .with_label(Label::new(("sample.tao", 50..76))
+            .with_message(format!(
+                "Usage of {} here",
+                "definition".fg(out2),
+            ))
+            .with_color(out2))
         .with_note(format!("Outputs of {} expressions must coerce to the same type", "match".fg(out)))
         .finish()
         .print(("sample.tao", Source::from(include_str!("sample.tao"))))
