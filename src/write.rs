@@ -378,7 +378,7 @@ impl<S: Span> Report<S> {
                                 LabelAttach::Start => label_info.label.span.start(),
                                 LabelAttach::Middle => (label_info.label.span.start() + label_info.label.span.end()) / 2,
                                 LabelAttach::End => label_info.label.last_offset(),
-                            } - line.offset(),
+                            }.saturating_sub(line.offset()),
                             label: label_info.label,
                             multi: false,
                             draw_msg: true,
