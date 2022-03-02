@@ -37,6 +37,8 @@ impl<S: Span> Report<S> {
                 },
             };
 
+            assert!(label.span.start() <= label.span.end(), "Label start is after its end");
+
             let start_line = src.get_offset_line(label.span.start()).map(|(_, l, _)| l);
             let end_line = src.get_offset_line(label.span.end().saturating_sub(1).max(label.span.start())).map(|(_, l, _)| l);
 
@@ -378,7 +380,7 @@ impl<S: Span> Report<S> {
                                 LabelAttach::Start => label_info.label.span.start(),
                                 LabelAttach::Middle => (label_info.label.span.start() + label_info.label.span.end()) / 2,
                                 LabelAttach::End => label_info.label.last_offset(),
-                            }.saturating_sub(line.offset()),
+                            }.max(label_info.label.span.start()) - line.offset(),
                             label: label_info.label,
                             multi: false,
                             draw_msg: true,
