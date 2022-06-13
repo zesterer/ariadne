@@ -214,11 +214,6 @@ impl<S: Span> ReportBuilder<S> {
         self
     }
 
-    /// Set the message of this report.
-    pub fn set_message<M: ToString>(&mut self, msg: M) {
-        self.msg = Some(msg.to_string());
-    }
-
     /// Add a message to this report.
     pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
         self.msg = Some(msg.to_string());
@@ -226,40 +221,26 @@ impl<S: Span> ReportBuilder<S> {
     }
 
     /// Set the note of this report.
-    pub fn set_note<N: ToString>(&mut self, note: N) {
-        self.note = Some(note.to_string());
-    }
-
-    /// Set the note of this report.
     pub fn with_note<N: ToString>(mut self, note: N) -> Self {
-        self.set_note(note);
+        self.note = Some(note.to_string());
         self
-    }
-
-    /// Set the help message of this report.
-    pub fn set_help<N: ToString>(&mut self, note: N) {
-        self.help = Some(note.to_string());
     }
 
     /// Set the help message of this report.
     pub fn with_help<N: ToString>(mut self, note: N) -> Self {
-        self.set_help(note);
+        self.help = Some(note.to_string());
         self
     }
 
     /// Add a label to the report.
-    pub fn add_label(&mut self, label: Label<S>) {
+    pub fn with_label(mut self, label: Label<S>) -> Self {
         self.labels.push(label);
+        self
     }
 
     /// Add multiple labels to the report.
-    pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) {
+    pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) -> Self {
         self.labels.extend(labels);
-    }
-
-    /// Add a label to the report.
-    pub fn with_label(mut self, label: Label<S>) -> Self {
-        self.add_label(label);
         self
     }
 
