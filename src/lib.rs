@@ -239,7 +239,7 @@ impl<S: Span> ReportBuilder<S> {
     }
 
     /// Add multiple labels to the report.
-    pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) -> Self {
+    pub fn add_labels<L: IntoIterator<Item = Label<S>>>(mut self, labels: L) -> Self {
         self.labels.extend(labels);
         self
     }
