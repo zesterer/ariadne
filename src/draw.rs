@@ -139,11 +139,11 @@ impl Default for ColorGenerator {
 }
 
 impl ColorGenerator {
-    /// the minimal brightness value
-    pub const MIN_BRIGHTNESS: f32 = 0.0;
+    /// the minimal possible brightness value
+    pub const MIN_BRIGHTNESS_VALUE: f32 = 0.0;
 
-    /// the maximal brightness value
-    pub const MAX_BRIGHTNESS: f32 = 1.0;
+    /// the maximal possible brightness value
+    pub const MAX_BRIGHTNESS_VALUE: f32 = 1.0;
 
     /// the default brightness
     pub const DEFAULT_BRIGHTNESS: f32 = 0.5;
@@ -161,8 +161,8 @@ impl ColorGenerator {
         Self {
             state,
             min_brightness: min_brightness
-                .max(Self::MIN_BRIGHTNESS)
-                .min(Self::MAX_BRIGHTNESS),
+                .max(Self::MIN_BRIGHTNESS_VALUE)
+                .min(Self::MAX_BRIGHTNESS_VALUE),
         }
     }
 
@@ -178,13 +178,16 @@ impl ColorGenerator {
             self.state[i] = (self.state[i] as usize).wrapping_add(40503 * (i * 4 + 1130)) as u16;
         }
         Color::Fixed(
-            16 + ((self.state[2] as f32 / 65535.0 * (1.0 - self.min_brightness)
+            16 + ((self.state[2] as f32 / 65535.0
+                * (Self::MAX_BRIGHTNESS_VALUE - self.min_brightness)
                 + self.min_brightness)
                 * 5.0
-                + (self.state[1] as f32 / 65535.0 * (1.0 - self.min_brightness)
+                + (self.state[1] as f32 / 65535.0
+                    * (Self::MAX_BRIGHTNESS_VALUE - self.min_brightness)
                     + self.min_brightness)
                     * 30.0
-                + (self.state[0] as f32 / 65535.0 * (1.0 - self.min_brightness)
+                + (self.state[0] as f32 / 65535.0
+                    * (Self::MAX_BRIGHTNESS_VALUE - self.min_brightness)
                     + self.min_brightness)
                     * 180.0) as u8,
         )
