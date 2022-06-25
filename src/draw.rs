@@ -112,7 +112,7 @@ pub struct Background<T>(T, Option<Color>);
 impl<T: fmt::Display> fmt::Display for Background<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(col) = self.1 {
-            write!(f, "{}", Paint::new(&self.0).fg(col))
+            write!(f, "{}", Paint::new(&self.0).bg(col))
         } else {
             write!(f, "{}", self.0)
         }
