@@ -7,7 +7,37 @@
 
 A fancy compiler diagnostics crate.
 
-## Example
+## Usage
+
+For each error you wish to report:
+* Call [`Report::build()`] to start a [`ReportBuilder`].
+* Assign whatever details are appropriate to the error using the various
+  methods, and then call the [`finish`](ReportBuilder::finish) method to get a
+  [`Report`] value.
+* For each `Report`, call [`print`](Report::print) or [`eprint`](Report::eprint)
+  to send the report directly to `stdout` or `stderr`. Alternately, you can use
+  [`write`](Report::write) to send the report to any other
+  [`Write`](std::io::Write) destinarion (such as a file).
+
+A program such as this:
+
+```rust
+use ariadne::{Report, ReportKind, Label, Source};
+
+fn main() {
+    let source = Source::from(include_str!("../examples/sample.tao"));
+
+    Report::build(ReportKind::Error, (), 34)
+        .with_message("Incompatible types")
+        .with_label(Label::new(32..33).with_message("This is of type Nat"))
+        .with_label(Label::new(42..45).with_message("This is of type Str"))
+        .finish()
+        .print(source)
+        .unwrap();
+}
+```
+
+Gives us the following printout in the terminal:
 
 <a href = "https://github.com/zesterer/ariadne/blob/main/examples/multiline.rs">
 <img src="https://raw.githubusercontent.com/zesterer/ariadne/main/misc/example.png" alt="Ariadne supports arbitrary multi-line spans"/>
