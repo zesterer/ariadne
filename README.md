@@ -21,7 +21,7 @@ For each error you wish to report:
 
 A program such as this:
 
-```rust
+```rust,ignore
 fn main() {
     use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 
