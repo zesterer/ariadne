@@ -10,14 +10,12 @@ A fancy compiler diagnostics crate.
 ## Usage
 
 For each error you wish to report:
-* Call [`Report::build()`] to start a [`ReportBuilder`].
+* Call `Report::build()` to create a `ReportBuilder`.
 * Assign whatever details are appropriate to the error using the various
-  methods, and then call the [`finish`](ReportBuilder::finish) method to get a
-  [`Report`] value.
-* For each `Report`, call [`print`](Report::print) or [`eprint`](Report::eprint)
-  to send the report directly to `stdout` or `stderr`. Alternately, you can use
-  [`write`](Report::write) to send the report to any other
-  [`Write`](std::io::Write) destinarion (such as a file).
+  methods, and then call the `finish` method to get a `Report`.
+* For each `Report`, call `print` or `eprint` to write the report
+  directly to `stdout` or `stderr`. Alternately, you can use
+  `write` to send the report to any other `Write` destinarion (such as a file).
 
 A program such as this:
 
