@@ -7,17 +7,11 @@
 
 A fancy compiler diagnostics crate.
 
-## Usage
+## Example
 
-For each error you wish to report:
-* Call `Report::build()` to create a `ReportBuilder`.
-* Assign whatever details are appropriate to the error using the various
-  methods, and then call the `finish` method to get a `Report`.
-* For each `Report`, call `print` or `eprint` to write the report
-  directly to `stdout` or `stderr`. Alternately, you can use
-  `write` to send the report to any other `Write` destinarion (such as a file).
-
-A program such as this:
+<a href = "https://github.com/zesterer/ariadne/blob/main/examples/multiline.rs">
+<img src="https://raw.githubusercontent.com/zesterer/ariadne/main/misc/example.png" alt="Ariadne supports arbitrary multi-line spans"/>
+</a>
 
 ```rust,ignore
 fn main() {
@@ -61,13 +55,17 @@ fn main() {
 }
 ```
 
-Gives us the following printout in the terminal:
-
-<a href = "https://github.com/zesterer/ariadne/blob/main/examples/multiline.rs">
-<img src="https://raw.githubusercontent.com/zesterer/ariadne/main/misc/example.png" alt="Ariadne supports arbitrary multi-line spans"/>
-</a>
-
 See [`examples/`](https://github.com/zesterer/ariadne/tree/main/examples) for more examples.
+
+## Usage
+
+For each error you wish to report:
+* Call `Report::build()` to create a `ReportBuilder`.
+* Assign whatever details are appropriate to the error using the various
+  methods, and then call the `finish` method to get a `Report`.
+* For each `Report`, call `print` or `eprint` to write the report
+  directly to `stdout` or `stderr`. Alternately, you can use
+  `write` to send the report to any other `Write` destinarion (such as a file).
 
 ## About
 
