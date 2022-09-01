@@ -24,7 +24,7 @@ struct SourceGroup<'a, S: Span> {
     labels: Vec<LabelInfo<'a, S>>,
 }
 
-impl<S: Span> Report<S> {
+impl<S: Span> Report<'_, S> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
         let mut groups = Vec::new();
         for label in self.labels.iter() {
