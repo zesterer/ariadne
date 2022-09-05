@@ -57,12 +57,12 @@ impl Span for Range<usize> {
     fn end(&self) -> usize { self.end }
 }
 
-impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, Range<usize>) {
+impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned, R: Span> Span for (Id, R) {
     type SourceId = Id;
 
     fn source(&self) -> &Self::SourceId { &self.0 }
-    fn start(&self) -> usize { self.1.start }
-    fn end(&self) -> usize { self.1.end }
+    fn start(&self) -> usize { self.1.start() }
+    fn end(&self) -> usize { self.1.end() }
 }
 
 /// A type that represents a labelled section of source code.
