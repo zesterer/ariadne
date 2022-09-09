@@ -459,9 +459,14 @@ impl<S: Span> Report<'_, S> {
                             self.config.unimportant_color()
                         };
                         let (c, width) = self.config.char_width(c, col);
-                        for _ in 0..width {
+                        if c.is_whitespace() {
+                            for _ in 0..width {
+                                write!(w, "{}", c.fg(color))?;
+                            }
+                        } else {
                             write!(w, "{}", c.fg(color))?;
-                        }
+                        };
+
                     }
                 }
                 write!(w, "\n")?;
