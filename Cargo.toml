@@ -16,3 +16,4 @@ exclude = [
 
 [dependencies]
 yansi = "0.5"
+unicode-width = "0.1.9"

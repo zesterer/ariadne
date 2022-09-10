@@ -21,6 +21,7 @@ use std::{
     cmp::{PartialEq, Eq},
     fmt,
 };
+use unicode_width::UnicodeWidthChar;
 
 /// A trait implemented by spans within a character-based source.
 pub trait Span {
@@ -369,7 +370,7 @@ impl Config {
                 (' ',  tab_end - col)
             },
             c if c.is_whitespace() => (' ', 1),
-            _ => (c, 1),
+            _ => (c, c.width().unwrap_or(1)),
         }
     }
 }
