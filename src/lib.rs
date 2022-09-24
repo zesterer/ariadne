@@ -263,6 +263,12 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
         self.add_label(label);
         self
     }
+    
+    /// Add multiple labels to the report.
+    pub fn with_labels<L: IntoIterator<Item = Label<S>>>(mut self, labels: L) -> Self {
+        self.add_labels(labels);
+        self
+    }
 
     /// Use the given [`Config`] to determine diagnostic attributes.
     pub fn with_config(mut self, config: Config) -> Self {
