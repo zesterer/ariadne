@@ -158,6 +158,14 @@ impl Cache<Path> for FileCache {
     fn display<'a>(&self, path: &'a Path) -> Option<Box<dyn fmt::Display + 'a>> { Some(Box::new(path.display())) }
 }
 
+impl<'a> IntoIterator for &'a FileCache {
+    type Item = (&'a PathBuf, &'a Source);
+    type IntoIter = ::std::collections::hash_map::Iter<'a, PathBuf, Source>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.files.iter()
+    }
+}
+
 /// A [`Cache`] that fetches [`Source`]s using the provided function.
 pub struct FnCache<Id, F> {
     sources: HashMap<Id, Source>,
