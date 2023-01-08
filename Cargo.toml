@@ -14,6 +14,10 @@ exclude = [
 	"/misc/*",
 ]
 
+[features]
+auto-color = ["concolor", "concolor/auto"]
+
 [dependencies]
 yansi = "0.5"
 unicode-width = "0.1.9"
+concolor = { version = "0.0.11", optional = true }

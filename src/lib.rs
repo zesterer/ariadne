@@ -12,9 +12,11 @@ pub use crate::{
 };
 pub use yansi::Color;
 
+#[cfg(any(feature = "concolor", doc))]
+pub use crate::draw::StdoutFmt;
+
 use crate::display::*;
 use std::{
-    borrow::Borrow,
     ops::Range,
     io::{self, Write},
     hash::Hash,
@@ -167,7 +169,7 @@ impl<S: Span> Report<'_, S> {
     /// In most cases, [`Report::eprint`] is the
     /// ['more correct'](https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)) function to use.
     pub fn print<C: Cache<S::SourceId>>(&self, cache: C) -> io::Result<()> {
-        self.write(cache, io::stdout())
+        self.write_for_stdout(cache, io::stdout())
     }
 }
 

@@ -88,6 +88,26 @@ you're thinking of using `ariadne` to process your compiler's output, why not tr
 - A plethora of other options (tab width, label attach points, underlines, etc.)
 - Built-in ordering/overlap heuristics that come up with the best way to avoid overlapping & label crossover
 
+## Cargo Features
+
+- `"concolor"` enables integration with the [`concolor`](https://crates.io/crates/concolor) crate for global color output
+  control across your application
+- `"auto-color"` enables `concolor`'s `"auto"` feature for automatic color control
+
+`concolor`'s features should be defined by the top-level binary crate, but without any features enabled `concolor` does
+nothing. If `ariadne` is your only dependency using `concolor` then `"auto-color"` provides a convenience to enable
+`concolor`'s automatic color support detection, i.e. this:
+```TOML
+[dependencies]
+ariadne = { version = "...", features = ["auto-color"] }
+```
+is equivalent to this:
+```TOML
+[dependencies]
+ariadne = { version = "...", features = ["concolor"] }
+concolor = { version = "...", features = ["auto"] }
+```
+
 ## Planned Features
 
 - Improved layout planning & space usage
