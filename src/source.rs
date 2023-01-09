@@ -156,6 +156,7 @@ impl Cache<Path> for FileCache {
 }
 
 /// A [`Cache`] that fetches [`Source`]s using the provided function.
+#[derive(Debug, Clone)]
 pub struct FnCache<Id, F> {
     sources: HashMap<Id, Source>,
     get: F,
