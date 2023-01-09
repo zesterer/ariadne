@@ -140,14 +140,9 @@ impl<Id: fmt::Display + Eq> Cache<Id> for (Id, Source) {
 }
 
 /// A [`Cache`] that fetches [`Source`]s from the filesystem.
+#[derive(Default, Debug, Clone)]
 pub struct FileCache {
     files: HashMap<PathBuf, Source>,
-}
-
-impl Default for FileCache {
-    fn default() -> Self {
-        Self { files: HashMap::default() }
-    }
 }
 
 impl Cache<Path> for FileCache {
@@ -161,6 +156,7 @@ impl Cache<Path> for FileCache {
 }
 
 /// A [`Cache`] that fetches [`Source`]s using the provided function.
+#[derive(Debug, Clone)]
 pub struct FnCache<Id, F> {
     sources: HashMap<Id, Source>,
     get: F,
