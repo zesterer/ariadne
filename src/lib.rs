@@ -67,6 +67,7 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, Range<usize
 }
 
 /// A type that represents a labelled section of source code.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Label<S = Range<usize>> {
     span: S,
     msg: Option<String>,

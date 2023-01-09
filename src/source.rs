@@ -30,6 +30,7 @@ impl<C: Cache<Id>, Id: ?Sized> Cache<Id> for Box<C> {
 }
 
 /// A type representing a single line of a [`Source`].
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Line {
     offset: usize,
     len: usize,
@@ -53,6 +54,7 @@ impl Line {
 /// A type representing a single source that may be referred to by [`Span`]s.
 ///
 /// In most cases, a source is a single input file.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Source {
     lines: Vec<Line>,
     len: usize,
