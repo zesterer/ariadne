@@ -171,6 +171,18 @@ impl<S: Span> Report<'_, S> {
     }
 }
 
+impl<'a, S: Span> fmt::Debug for Report<'a, S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Report")
+            .field("kind", &self.kind)
+            .field("code", &self.code)
+            .field("msg", &self.msg)
+            .field("note", &self.note)
+            .field("help", &self.help)
+            .field("config", &self.config)
+            .finish()
+    }
+}
 /// A type that defines the kind of report being produced.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReportKind<'a> {
@@ -289,6 +301,19 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
             labels: self.labels,
             config: self.config,
         }
+    }
+}
+
+impl<'a, S: Span> fmt::Debug for ReportBuilder<'a, S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ReportBuilder")
+            .field("kind", &self.kind)
+            .field("code", &self.code)
+            .field("msg", &self.msg)
+            .field("note", &self.note)
+            .field("help", &self.help)
+            .field("config", &self.config)
+            .finish()
     }
 }
 
