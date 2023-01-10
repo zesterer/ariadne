@@ -263,12 +263,13 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
 
     /// Add a label to the report.
     pub fn add_label(&mut self, label: Label<S>) {
-        self.labels.push(label);
+        self.add_labels(std::iter::once(label));
     }
 
     /// Add multiple labels to the report.
     pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) {
-        self.labels.extend(labels);
+        let config = &self.config; // This would not be necessary in Rust 2021 edition
+        self.labels.extend(labels.into_iter().map(|mut label| { label.color = config.filter_color(label.color); label }));
     }
 
     /// Add a label to the report.
@@ -392,6 +393,7 @@ impl Config {
     fn margin_color(&self) -> Option<Color> { Some(Color::Fixed(246)).filter(|_| self.color) }
     fn unimportant_color(&self) -> Option<Color> { Some(Color::Fixed(249)).filter(|_| self.color) }
     fn note_color(&self) -> Option<Color> { Some(Color::Fixed(115)).filter(|_| self.color) }
+    fn filter_color(&self, color: Option<Color>) -> Option<Color> { color.filter(|_| self.color) }
 
     // Find the character that should be drawn and the number of times it should be drawn for each char
     fn char_width(&self, c: char, col: usize) -> (char, usize) {
