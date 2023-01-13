@@ -198,14 +198,20 @@ impl<S: Span> Report<'_, S> {
                         line_no,
                         draw.vbar,
                     )
+                        .fg(self.config.margin_color())
                 } else {
-                    format!("{}{}", Show((' ', line_no_width + 1)), if is_ellipsis { draw.vbar_gap } else { draw.vbar_break })
+                    format!("{}{}", Show((' ', line_no_width + 1)), if is_ellipsis {
+                        draw.vbar_gap
+                    } else {
+                        draw.vbar
+                    })
+                        .fg(self.config.skipped_margin_color())
                 };
 
                 write!(
                     w,
                     " {}{}",
-                    line_no_margin.fg(self.config.margin_color()),
+                    line_no_margin,
                     Show(Some(' ').filter(|_| !self.config.compact)),
                 )?;
 

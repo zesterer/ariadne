@@ -277,7 +277,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
         self.add_label(label);
         self
     }
-    
+
     /// Add multiple labels to the report.
     pub fn with_labels<L: IntoIterator<Item = Label<S>>>(mut self, labels: L) -> Self {
         self.add_labels(labels);
@@ -391,6 +391,7 @@ impl Config {
     fn warning_color(&self) -> Option<Color> { Some(Color::Yellow).filter(|_| self.color) }
     fn advice_color(&self) -> Option<Color> { Some(Color::Fixed(147)).filter(|_| self.color) }
     fn margin_color(&self) -> Option<Color> { Some(Color::Fixed(246)).filter(|_| self.color) }
+    fn skipped_margin_color(&self) -> Option<Color> { Some(Color::Fixed(240)).filter(|_| self.color) }
     fn unimportant_color(&self) -> Option<Color> { Some(Color::Fixed(249)).filter(|_| self.color) }
     fn note_color(&self) -> Option<Color> { Some(Color::Fixed(115)).filter(|_| self.color) }
     fn filter_color(&self, color: Option<Color>) -> Option<Color> { color.filter(|_| self.color) }
