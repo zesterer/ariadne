@@ -3,7 +3,7 @@ use super::*;
 use std::{
     path::{Path, PathBuf},
     collections::{HashMap, hash_map::Entry},
-    fs,
+    fs, mem::replace,
 };
 
 /// A trait implemented by [`Source`] caches.
@@ -66,20 +66,49 @@ impl<S: AsRef<str>> From<S> for Source {
     /// Note that this function can be expensive for long strings. Use an implementor of [`Cache`] where possible.
     fn from(s: S) -> Self {
         let mut offset = 0;
+        // (Last line, last line ends with CR)
+        let mut last_line: Option<(Line, bool)> = None;
+        let mut lines: Vec<Line> = s
+            .as_ref()
+            .split_inclusive([
+                '\r', // Carriage return
+                '\n', // Line feed
+                '\x0B', // Vertical tab
+                '\x0C', // Form feed
+                '\u{0085}', // Next line
+                '\u{2028}', // Line separator
+                '\u{2029}' // Paragraph separator
+            ])
+            .flat_map(|line| {
+                // Returns last line and set `last_line` to current `line`
+                // A hack that makes `flat_map` deals with consecutive lines
+
+                if let Some((last, ends_with_cr)) = last_line.as_mut() {
+                    if *ends_with_cr && line == "\n" {
+                        last.len += 1;
+                        offset += 1;
+                        return replace(&mut last_line, None).map(|(l, _)| l);
+                    }
+                }
+
+                let len = line.chars().count();
+                let ends_with_cr = line.ends_with('\r');
+                let line = Line {
+                    offset,
+                    len,
+                    chars: line.trim_end().to_owned(),
+                };
+                offset += len;
+                replace(&mut last_line, Some((line, ends_with_cr))).map(|(l, _)| l)
+            })
+            .collect();
+
+        if let Some((l, _)) = last_line {
+            lines.push(l);
+        }
+
         Self {
-            lines: s
-                .as_ref()
-                .split_terminator('\n') // TODO: Handle non-\n newlines
-                .map(|line| {
-                    let l = Line {
-                        offset,
-                        len: line.chars().count() + 1,
-                        chars: line.trim_end().to_owned(),
-                    };
-                    offset += l.len;
-                    l
-                })
-                .collect(),
+            lines,
             len: offset,
         }
     }
@@ -207,4 +236,46 @@ where
             .into_iter()
             .map(|(id, s)| (id, Source::from(s.as_ref())))
             .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::iter::zip;
+
+    use super::Source;
+
+    #[test]
+    fn source_from() {
+        fn test(lines: Vec<&str>) {
+            let source: String = lines.iter().map(|s| *s).collect();
+            let source = Source::from(source);
+            
+            assert_eq!(source.lines.len(), lines.len());
+
+            let mut offset = 0;
+            for (source_line, raw_line) in zip(source.lines.into_iter(), lines.into_iter()) {
+                assert_eq!(source_line.offset, offset);
+                assert_eq!(source_line.len, raw_line.chars().count());
+                assert_eq!(source_line.chars, raw_line.trim_end());
+                offset += source_line.len;
+            }
+            
+            assert_eq!(source.len, offset);
+        }
+
+        test(vec![]); // Empty string
+
+        test(vec!["Single line"]);
+        test(vec!["Single line with LF\n"]);
+        test(vec!["Single line with CRLF\r\n"]);
+
+        test(vec!["Two\r\n", "lines\n"]);
+        test(vec!["Some\n", "more\r\n", "lines"]);
+        test(vec!["\n", "\r\n", "\n", "Empty Lines"]);
+
+        test(vec!["Trailing spaces  \n", "are trimmed\t"]);
+
+        // Line endings other than LF or CRLF
+        test(vec!["CR\r", "VT\x0B", "FF\x0C", "NEL\u{0085}", "LS\u{2028}", "PS\u{2029}"]);
+    }
 }
