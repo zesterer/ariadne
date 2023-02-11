@@ -110,7 +110,7 @@ impl<S> Label<S> {
     ///
     /// When labels are displayed after a line the crate needs to decide which labels should be displayed first. By
     /// Default, the orders labels based on where their associated line meets the text (see [`LabelAttach`]).
-    /// Additionally, multi-line labels are ordered before inline labels. You can this this function to override this
+    /// Additionally, multi-line labels are ordered before inline labels. You can use this function to override this
     /// behaviour.
     pub fn with_order(mut self, order: i32) -> Self {
         self.order = order;
@@ -124,7 +124,7 @@ impl<S> Label<S> {
     /// If unspecified, labels default to a priority of `0`.
     ///
     /// Label spans can overlap. When this happens, the crate needs to decide which labels to prioritise for various
-    /// purposes such as highlighting. By default, spans with a smaller length get a higher priority. You can this this
+    /// purposes such as highlighting. By default, spans with a smaller length get a higher priority. You can use this
     /// function to override this behaviour.
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.priority = priority;
