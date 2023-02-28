@@ -65,7 +65,7 @@ For each error you wish to report:
   methods, and then call the `finish` method to get a `Report`.
 * For each `Report`, call `print` or `eprint` to write the report
   directly to `stdout` or `stderr`. Alternately, you can use
-  `write` to send the report to any other `Write` destinarion (such as a file).
+  `write` to send the report to any other `Write` destination (such as a file).
 
 ## About
 
