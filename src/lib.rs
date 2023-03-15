@@ -91,8 +91,8 @@ impl<S> Label<S> {
     }
 
     /// Give this label a message.
-    pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
-        self.msg = Some(msg.to_string());
+    pub fn with_message<M: Into<String>>(mut self, msg: M) -> Self {
+        self.msg = Some(msg.into());
         self
     }
 
@@ -231,34 +231,34 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     }
 
     /// Set the message of this report.
-    pub fn set_message<M: ToString>(&mut self, msg: M) {
-        self.msg = Some(msg.to_string());
+    pub fn set_message<M: Into<String>>(&mut self, msg: M) {
+        self.msg = Some(msg.into());
     }
 
     /// Add a message to this report.
-    pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
-        self.msg = Some(msg.to_string());
+    pub fn with_message<M: Into<String>>(mut self, msg: M) -> Self {
+        self.msg = Some(msg.into());
         self
     }
 
     /// Set the note of this report.
-    pub fn set_note<N: ToString>(&mut self, note: N) {
-        self.note = Some(note.to_string());
+    pub fn set_note<N: Into<String>>(&mut self, note: N) {
+        self.note = Some(note.into());
     }
 
     /// Set the note of this report.
-    pub fn with_note<N: ToString>(mut self, note: N) -> Self {
+    pub fn with_note<N: Into<String>>(mut self, note: N) -> Self {
         self.set_note(note);
         self
     }
 
     /// Set the help message of this report.
-    pub fn set_help<N: ToString>(&mut self, note: N) {
-        self.help = Some(note.to_string());
+    pub fn set_help<N: Into<String>>(&mut self, note: N) {
+        self.help = Some(note.into());
     }
 
     /// Set the help message of this report.
-    pub fn with_help<N: ToString>(mut self, note: N) -> Self {
+    pub fn with_help<N: Into<String>>(mut self, note: N) -> Self {
         self.set_help(note);
         self
     }
