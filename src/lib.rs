@@ -5,6 +5,7 @@ mod source;
 mod display;
 mod draw;
 mod write;
+mod caused_by;
 
 pub use crate::{
     source::{Line, Source, Cache, FileCache, FnCache, sources},
