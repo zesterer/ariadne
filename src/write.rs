@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::io;
 use std::ops::Range;
+use crate::CausedByConfig;
 
 use super::draw::{self, StreamAwareFmt, StreamType};
 use super::{Cache, CharSet, Label, LabelAttach, Report, ReportKind, Show, Span, Write};
@@ -774,6 +775,52 @@ impl<S: Span> Report<'_, S> {
                         Show((' ', line_no_width + 2)),
                         draw.vbar.fg(self.config.margin_color(), s)
                     )?;
+                }
+            }
+        }
+        if !self.backtrace.frames.is_empty() {
+            let indent = if self.config.compact { "  " } else { "    " };
+            write!(w, "\n")?;
+            write!(w, "{}\n", "Caused by:".fg(self.config.note_color(), s))?;
+            // TODO: make this configurable
+            let mut config = CausedByConfig::default();
+            config.label_index_start = 0;
+            config.show_label_numbers = true;
+            if config.show_label_numbers {
+                let max = config.label_index_start + self.backtrace.frames.len();
+                let max_width = max.to_string().len();
+                // 0: object
+                //    at path/to/file.rs:123:45
+                for (index, frame) in self.backtrace.frames.iter().enumerate() {
+                    match &frame.object {
+                        Some(s) => {
+                            writeln!(w, "{indent}{:width$}: {object}", index + config.label_index_start, width = max_width, object = s)?;
+                            write!(w, "{indent}{:width$}  at {path}", "", width = max_width, path = &frame.file)?;
+                        }
+                        None => {
+                            write!(w, "{:width$}: {path}", index + config.label_index_start, width = max_width, path = &frame.file)?;
+                        }
+                    }
+                    match &frame.position {
+                        Some((line, col)) => writeln!(w, "({}:{})", line, col)?,
+                        None => writeln!(w)?
+                    }
+                }
+            } else {
+                for frame in &self.backtrace.frames {
+                    match &frame.object {
+                        Some(s) => {
+                            writeln!(w, "{indent}{}", s)?;
+                            write!(w, "{indent}{indent}at {}", &frame.file)?;
+                        }
+                        None => {
+                            write!(w, "{}", &frame.file)?;
+                        }
+                    }
+                    match &frame.position {
+                        Some((line, col)) => writeln!(w, "({}:{})", line, col)?,
+                        None => writeln!(w)?
+                    }
                 }
             }
         }

@@ -1,17 +1,21 @@
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
-pub struct BacktraceConfig {
+/// Configuration for display backtraces
+pub struct CausedByConfig {
     /// Show the backtrace with number labels
     pub show_label_numbers: bool,
     /// Number labels start at this index, `index0` vs `index1`
     pub label_index_start: usize,
 }
 
-pub struct BackTrace {
-    frames: Vec<BackTraceFrame>,
+/// A backtrace collection
+pub struct CausedBy {
+    pub(crate) frames: Vec<CausedByFrame>,
 }
 
-pub struct BackTraceFrame {
+/// A backtrace frame
+#[derive(Debug)]
+pub struct CausedByFrame {
     /// File path buf
     pub file: String,
     /// Function name, or module path, e.g. `std::io::read_line`
@@ -20,7 +24,7 @@ pub struct BackTraceFrame {
     pub position: Option<(usize, usize)>,
 }
 
-impl Default for BacktraceConfig {
+impl Default for CausedByConfig {
     fn default() -> Self {
         Self {
             show_label_numbers: true,
@@ -29,46 +33,56 @@ impl Default for BacktraceConfig {
     }
 }
 
-impl Default for BackTrace {
+impl Default for CausedBy {
     fn default() -> Self {
         Self { frames: Vec::new() }
     }
 }
 
-impl BackTrace {
+impl CausedBy {
     /// Add a frame to the backtrace
-    pub fn with_frame(&mut self, frame: BackTraceFrame) {
+    pub fn push_frame(&mut self, frame: CausedByFrame) {
         self.frames.push(frame);
     }
-    /// Add a io error to the backtrace
-    pub fn with_io_error(&mut self, error: std::io::Error, path: impl AsRef<Path>) {
-        let path = path.as_ref();
-        let path = path.to_str().unwrap_or_else(|| path.to_string_lossy().as_ref());
-        self.frames.push(BackTraceFrame::new(path).with_object(error.to_string()));
+    /// Clear all of the frames
+    pub fn clear(&mut self) {
+        self.frames.clear();
     }
 }
 
-impl BackTraceFrame {
+impl CausedByFrame {
     /// Create a new backtrace frame
     pub fn new(file: impl Into<String>) -> Self {
         let path = file.into();
-        debug_assert!(path.lines().count() == 1, "File path must be in a single line");
+        debug_assert!(
+            path.lines().count() == 1,
+            "File path must be in a single line"
+        );
         Self {
             file: path,
             object: None,
             position: None,
         }
     }
+    /// Add an io error to the backtrace
+    pub fn io_error(error: std::io::Error, path: impl AsRef<Path>) -> Self {
+        let path = path.as_ref();
+        let path = path.to_string_lossy().to_string();
+        Self::new(path).with_object(error.to_string())
+    }
     /// Name to display for the object
     pub fn with_object(mut self, object: impl Into<String>) -> Self {
         let name = object.into();
-        debug_assert!(name.lines().count() == 1, "Object name must be in a single line");
+        debug_assert!(
+            name.lines().count() == 1,
+            "Object name must be in a single line"
+        );
         self.object = Some(name);
         self
     }
     /// Where the object is located
-    pub fn with_position(mut self, position: (usize, usize)) -> Self {
-        self.position = Some(position);
+    pub fn with_position(mut self, line: usize, column: usize) -> Self {
+        self.position = Some((line, column));
         self
     }
 }
