@@ -227,14 +227,19 @@ impl<S: Span> Report<'_, S> {
 
             // Generate a list of multi-line labels
             let mut multi_labels = Vec::new();
+            let mut multi_labels_with_message = Vec::new();
             for label_info in &labels {
                 if matches!(label_info.kind, LabelKind::Multiline) {
                     multi_labels.push(&label_info.label);
+                    if label_info.label.msg.is_some() {
+                        multi_labels_with_message.push(&label_info.label);
+                    }
                 }
             }
 
             // Sort multiline labels by length
             multi_labels.sort_by_key(|m| -(m.span.len() as isize));
+            multi_labels_with_message.sort_by_key(|m| -(m.span.len() as isize));
 
             let write_margin = |w: &mut W,
                                 idx: usize,
@@ -276,16 +281,16 @@ impl<S: Span> Report<'_, S> {
 
                 // Multi-line margins
                 if draw_labels {
-                    for col in 0..multi_labels.len() + (multi_labels.len() > 0) as usize {
+                    for col in 0..multi_labels_with_message.len() + (multi_labels_with_message.len() > 0) as usize {
                         let mut corner = None;
                         let mut hbar = None;
                         let mut vbar: Option<&&Label<S>> = None;
                         let mut margin_ptr = None;
 
-                        let multi_label = multi_labels.get(col);
+                        let multi_label = multi_labels_with_message.get(col);
                         let line_span = src.line(idx).unwrap().span();
 
-                        for (i, label) in multi_labels[0..(col + 1).min(multi_labels.len())]
+                        for (i, label) in multi_labels_with_message[0..(col + 1).min(multi_labels_with_message.len())]
                             .iter()
                             .enumerate()
                         {
@@ -338,7 +343,7 @@ impl<S: Span> Report<'_, S> {
                         if let (Some((margin, _is_start)), true) = (margin_ptr, is_line) {
                             let is_col = multi_label
                                 .map_or(false, |ml| **ml as *const _ == margin.label as *const _);
-                            let is_limit = col + 1 == multi_labels.len();
+                            let is_limit = col + 1 == multi_labels_with_message.len();
                             if !is_col && !is_limit {
                                 hbar = hbar.or(Some(margin.label));
                             }
@@ -375,7 +380,7 @@ impl<S: Span> Report<'_, S> {
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
                             let is_col = multi_label
                                 .map_or(false, |ml| **ml as *const _ == margin.label as *const _);
-                            let is_limit = col == multi_labels.len();
+                            let is_limit = col == multi_labels_with_message.len();
                             (
                                 if is_limit {
                                     draw.rarrow
@@ -412,7 +417,7 @@ impl<S: Span> Report<'_, S> {
                     continue;
                 };
 
-                let margin_label = multi_labels
+                let margin_label = multi_labels_with_message
                     .iter()
                     .enumerate()
                     .filter_map(|(_i, label)| {
@@ -440,7 +445,7 @@ impl<S: Span> Report<'_, S> {
                     .min_by_key(|ll| (ll.col, !ll.label.span.start()));
 
                 // Generate a list of labels for this line, along with their label columns
-                let mut line_labels = multi_labels
+                let mut line_labels = multi_labels_with_message
                     .iter()
                     .enumerate()
                     .filter_map(|(_i, label)| {
