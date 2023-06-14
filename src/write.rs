@@ -608,7 +608,10 @@ impl<S: Span> Report<'_, S> {
                 // Arrows
                 for row in 0..line_labels.len() {
                     let line_label = &line_labels[row];
-
+                    //No message to draw thus no arrow to draw
+                    if line_label.label.msg.is_none() {
+                        continue
+                    }
                     if !self.config.compact {
                         // Margin alternate
                         write_margin(
