@@ -80,6 +80,7 @@ pub struct Label<S = Range<usize>> {
 
 impl<S> Label<S> {
     /// Create a new [`Label`].
+    /// If the span is specified as a `Range<usize>` the numbers have to be zero-indexed character offsets.
     pub fn new(span: S) -> Self {
         Self {
             span,
