@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # Unreleased
 
+### Breaking changes
+
+- Added missing `S: Span` bound for `Label::new` constructor.
+
+- Previously labels with backwards spans could be constructed and
+  only resulted in a panic when writing (or printing) the report.
+  Now `Label::new` panics immediately when passed a backwards span.
+
 ### Added
 
 ### Removed

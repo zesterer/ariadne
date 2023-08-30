@@ -78,10 +78,19 @@ pub struct Label<S = Range<usize>> {
     priority: i32,
 }
 
-impl<S> Label<S> {
+impl<S: Span> Label<S> {
     /// Create a new [`Label`].
     /// If the span is specified as a `Range<usize>` the numbers have to be zero-indexed character offsets.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given span is backwards.
     pub fn new(span: S) -> Self {
+        assert!(
+            span.start() <= span.end(),
+            "Label start is after its end"
+        );
+
         Self {
             span,
             msg: None,
@@ -426,4 +435,10 @@ impl Default for Config {
             char_set: CharSet::Unicode,
         }
     }
+}
+
+#[test]
+#[should_panic]
+fn backwards_label_should_panic() {
+    Label::new(1..0);
 }

@@ -42,11 +42,6 @@ impl<S: Span> Report<'_, S> {
                 }
             };
 
-            assert!(
-                label.span.start() <= label.span.end(),
-                "Label start is after its end"
-            );
-
             let start_line = src.get_offset_line(label.span.start()).map(|(_, l, _)| l);
             let end_line = src
                 .get_offset_line(label.span.end().saturating_sub(1).max(label.span.start()))
@@ -882,15 +877,6 @@ mod tests {
            |             `---- This is an orange
         ---'
         "###);
-    }
-
-    #[test]
-    #[should_panic]
-    fn backwards_label_should_panic() {
-        let _ = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_label(Label::new(5..0))
-            .finish()
-            .write_to_string(Source::from(""));
     }
 
     #[test]
