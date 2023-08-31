@@ -29,7 +29,7 @@ struct SourceGroup<'a, S: Span> {
     labels: Vec<LabelInfo<'a, S>>,
 }
 
-impl<S: Span, C: Cache<S::SourceId>> Report<'_, C, S> {
+impl<S: Span> Report<'_, S> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
         let mut groups = Vec::new();
         for label in self.labels.iter() {
@@ -80,20 +80,27 @@ impl<S: Span, C: Cache<S::SourceId>> Report<'_, C, S> {
     /// `stderr`.  If you are printing to `stdout`, use the [`write_for_stdout`](Self::write_for_stdout) method instead.
     ///
     /// If you wish to write to `stderr` or `stdout`, you can do so via [`Report::eprint`] or [`Report::print`] respectively.
-    pub fn write<W: Write>(&self, cache: C, w: W) -> io::Result<()> {
+    pub fn write<C: Cache<S::SourceId>, W: Write>(&self, cache: C, w: W) -> io::Result<()> {
         self.write_for_stream(cache, w, StreamType::Stderr)
     }
 
     /// Write this diagnostic to an implementor of [`Write`], assuming that the output is ultimately going to be printed
     /// to `stdout`.
-    pub fn write_for_stdout<W: Write>(&self, cache: C, w: W, ) -> io::Result<()> {
+    pub fn write_for_stdout<C: Cache<S::SourceId>, W: Write>(
+        &self,
+        cache: C,
+        w: W,
+    ) -> io::Result<()> {
         self.write_for_stream(cache, w, StreamType::Stdout)
     }
 
     /// Write this diagnostic to an implementor of [`Write`], assuming that the output is ultimately going to be printed
     /// to the given output stream (`stdout` or `stderr`).
-    fn write_for_stream<W: Write>(
-        &self, mut cache: C, mut w: W, s: StreamType,
+    fn write_for_stream<C: Cache<S::SourceId>, W: Write>(
+        &self,
+        mut cache: C,
+        mut w: W,
+        s: StreamType,
     ) -> io::Result<()> {
         let draw = match self.config.char_set {
             CharSet::Unicode => draw::Characters::unicode(),
@@ -794,12 +801,19 @@ mod tests {
     //!
     //! and insta will fill it in.
 
-    use std::error::Error;
     use std::ops::Range;
 
     use insta::assert_snapshot;
 
-    use crate::{CharSet, Config, Label, Report, ReportKind, Source};
+    use crate::{Cache, CharSet, Config, Label, Report, ReportKind, Source, Span};
+
+    impl<S: Span> Report<'_, S> {
+        fn write_to_string<C: Cache<S::SourceId>>(&self, cache: C) -> String {
+            let mut vec = Vec::new();
+            self.write(cache, &mut vec).unwrap();
+            String::from_utf8(vec).unwrap()
+        }
+    }
 
     fn no_color_and_ascii() -> Config {
         Config::default()
@@ -811,12 +825,11 @@ mod tests {
 
     #[test]
     fn one_message() {
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
-            .with_source(Source::from(""))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(""));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
         "###)
@@ -825,14 +838,13 @@ mod tests {
     #[test]
     fn two_labels_without_messages() {
         let source = "apple == orange;";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5))
             .with_label(Label::new(9..15))
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         // TODO: it would be nice if these spans still showed up (like codespan-reporting does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
@@ -846,14 +858,13 @@ mod tests {
     #[test]
     fn two_labels_with_messages() {
         let source = "apple == orange;";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
@@ -871,15 +882,14 @@ mod tests {
     #[test]
     fn label_at_end_of_long_line() {
         let source = format!("{}orange", "apple == ".repeat(100));
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
             .with_label(
                 Label::new(source.len() - 5..source.len()).with_message("This is an orange"),
             )
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         // TODO: it would be nice if the start of long lines would be omitted (like rustc does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
@@ -895,12 +905,11 @@ mod tests {
     #[test]
     fn multiline_label() {
         let source = "apple\n==\norange";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         // TODO: it would be nice if the 2nd line wasn't omitted
         assert_snapshot!(msg, @r###"
         Error: 
@@ -918,13 +927,12 @@ mod tests {
     #[test]
     fn partially_overlapping_labels() {
         let source = "https://example.com/";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_label(Label::new(0..source.len()).with_message("URL"))
             .with_label(Label::new(0..source.find(':').unwrap()).with_message("scheme"))
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         // TODO: it would be nice if you could tell where the spans start and end.
         assert_snapshot!(msg, @r###"
         Error: 
@@ -942,7 +950,7 @@ mod tests {
     #[test]
     fn multiple_labels_same_span() {
         let source = "apple == orange;";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
@@ -951,9 +959,8 @@ mod tests {
             .with_label(Label::new(9..15).with_message("This is an orange"))
             .with_label(Label::new(9..15).with_message("Have I mentioned that this is an orange?"))
             .with_label(Label::new(9..15).with_message("No really, have I mentioned that?"))
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
            ,-[<unknown>:1:1]
@@ -978,15 +985,14 @@ mod tests {
     #[test]
     fn note() {
         let source = "apple == orange;";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
             .with_note("stop trying ... this is a fruitless endeavor")
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
            ,-[<unknown>:1:1]
@@ -1005,15 +1011,14 @@ mod tests {
     #[test]
     fn help() {
         let source = "apple == orange;";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
             .with_help("have you tried peeling the orange?")
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
            ,-[<unknown>:1:1]
@@ -1032,16 +1037,15 @@ mod tests {
     #[test]
     fn help_and_note() {
         let source = "apple == orange;";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
             .with_config(no_color_and_ascii())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
             .with_help("have you tried peeling the orange?")
             .with_note("stop trying ... this is a fruitless endeavor")
-            .with_source(Source::from(source))
             .finish()
-            .write_to_string();
+            .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
            ,-[<unknown>:1:1]
@@ -1057,24 +1061,5 @@ mod tests {
            | Note: stop trying ... this is a fruitless endeavor
         ---'
         "###)
-    }
-
-    #[test]
-    fn report_to_error() {
-        let source = "apple == orange;";
-        let msg = Report::<_, Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..5).with_message("This is an apple"))
-            .with_label(Label::new(9..15).with_message("This is an orange"))
-            .with_help("have you tried peeling the orange?")
-            .with_note("stop trying ... this is a fruitless endeavor")
-            .with_source(Source::from(source))
-            .finish();
-
-        let err: &dyn Error = &msg; // This bit compiling proves it is Error
-
-        println!("{err}");
-        println!("{err:?}");
     }
 }

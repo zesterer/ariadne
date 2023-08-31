@@ -23,7 +23,6 @@ use std::{
     cmp::{PartialEq, Eq},
     fmt,
 };
-use std::error::Error;
 use unicode_width::UnicodeWidthChar;
 
 /// A trait implemented by spans within a character-based source.
@@ -144,7 +143,7 @@ impl<S: Span> Label<S> {
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
-pub struct Report<'a, C: Cache<S::SourceId>, S: Span = Range<usize>> {
+pub struct Report<'a, S: Span = Range<usize>> {
     kind: ReportKind<'a>,
     code: Option<String>,
     msg: Option<String>,
@@ -153,12 +152,11 @@ pub struct Report<'a, C: Cache<S::SourceId>, S: Span = Range<usize>> {
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
     config: Config,
-    cache: C
 }
 
-impl<S: Span, C: Cache<S::SourceId>> Report<'_, C, S> {
+impl<S: Span> Report<'_, S> {
     /// Begin building a new [`Report`].
-    pub fn build<Id: Into<<S::SourceId as ToOwned>::Owned>>(kind: ReportKind, src_id: Id, offset: usize) -> ReportBuilder<C, S> {
+    pub fn build<Id: Into<<S::SourceId as ToOwned>::Owned>>(kind: ReportKind, src_id: Id, offset: usize) -> ReportBuilder<S> {
         ReportBuilder {
             kind,
             code: None,
@@ -168,12 +166,11 @@ impl<S: Span, C: Cache<S::SourceId>> Report<'_, C, S> {
             location: (src_id.into(), offset),
             labels: Vec::new(),
             config: Config::default(),
-            cache: None
         }
     }
 
     /// Write this diagnostic out to `stderr`.
-    pub fn eprint(&self, cache: C) -> io::Result<()> {
+    pub fn eprint<C: Cache<S::SourceId>>(&self, cache: C) -> io::Result<()> {
         self.write(cache, io::stderr())
     }
 
@@ -181,19 +178,12 @@ impl<S: Span, C: Cache<S::SourceId>> Report<'_, C, S> {
     ///
     /// In most cases, [`Report::eprint`] is the
     /// ['more correct'](https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)) function to use.
-    pub fn print(&self, cache: C) -> io::Result<()> {
+    pub fn print<C: Cache<S::SourceId>>(&self, cache: C) -> io::Result<()> {
         self.write_for_stdout(cache, io::stdout())
-    }
-
-    /// Write this diagnostic into a [`String`]
-    fn write_to_string(&self) -> String {
-        let mut vec = Vec::new();
-        self.write(*self.cache.dupe(), &mut vec).unwrap();
-        String::from_utf8(vec).unwrap()
     }
 }
 
-impl<'a, C: Cache<S::SourceId>, S: Span> fmt::Debug for Report<'a, C, S> {
+impl<'a, S: Span> fmt::Debug for Report<'a, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Report")
             .field("kind", &self.kind)
@@ -205,16 +195,6 @@ impl<'a, C: Cache<S::SourceId>, S: Span> fmt::Debug for Report<'a, C, S> {
             .finish()
     }
 }
-
-impl<'a, C: Cache<S::SourceId>, S:Span> fmt::Display for Report<'a, C, S> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.write_to_string())
-    }
-}
-
-impl<S: Span, C: Cache<S::SourceId>> Error for Report<'_, C, S> {}
-
-
 /// A type that defines the kind of report being produced.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReportKind<'a> {
@@ -242,7 +222,7 @@ impl fmt::Display for ReportKind<'_> {
 }
 
 /// A type used to build a [`Report`].
-pub struct ReportBuilder<'a, C: Cache<S::SourceId>, S: Span> {
+pub struct ReportBuilder<'a, S: Span> {
     kind: ReportKind<'a>,
     code: Option<String>,
     msg: Option<String>,
@@ -251,12 +231,11 @@ pub struct ReportBuilder<'a, C: Cache<S::SourceId>, S: Span> {
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
     config: Config,
-    cache: Option<C>
 }
 
-impl<'a, S: Span, C: Cache<S::SourceId>> ReportBuilder<'a, C, S> {
+impl<'a, S: Span> ReportBuilder<'a, S> {
     /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
-    pub fn with_code<D: fmt::Display>(mut self, code: D) -> Self {
+    pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
         self.code = Some(format!("{:02}", code));
         self
     }
@@ -323,19 +302,8 @@ impl<'a, S: Span, C: Cache<S::SourceId>> ReportBuilder<'a, C, S> {
         self
     }
 
-    /// Add a file source to link spans and code
-    pub fn with_source(mut self, cache: C) -> Self {
-        self.cache = Some(cache);
-        self
-    }
-
     /// Finish building the [`Report`].
-    pub fn finish(self) -> Report<'a, C, S> {
-        assert!(
-            self.cache.is_some(),
-            "Cache needs to be given before finish (e.g: builder.with_cache(...)"
-        );
-
+    pub fn finish(self) -> Report<'a, S> {
         Report {
             kind: self.kind,
             code: self.code,
@@ -345,12 +313,11 @@ impl<'a, S: Span, C: Cache<S::SourceId>> ReportBuilder<'a, C, S> {
             location: self.location,
             labels: self.labels,
             config: self.config,
-            cache: self.cache.unwrap()
         }
     }
 }
 
-impl<'a, S: Span, C: Cache<S::SourceId>> fmt::Debug for ReportBuilder<'a, C, S> {
+impl<'a, S: Span> fmt::Debug for ReportBuilder<'a, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)
