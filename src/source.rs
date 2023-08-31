@@ -17,6 +17,9 @@ pub trait Cache<Id: ?Sized> {
     /// This function may make use of attributes from the [`Fmt`] trait.
     // TODO: Don't box
     fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>>;
+
+    /// Duplicate self, same as Clone but manual
+    fn dupe(&self) -> Box<Self> { todo!() }
 }
 
 impl<'b, C: Cache<Id>, Id: ?Sized> Cache<Id> for &'b mut C {
@@ -27,6 +30,7 @@ impl<'b, C: Cache<Id>, Id: ?Sized> Cache<Id> for &'b mut C {
 impl<C: Cache<Id>, Id: ?Sized> Cache<Id> for Box<C> {
     fn fetch(&mut self, id: &Id) -> Result<&Source, Box<dyn fmt::Debug + '_>> { C::fetch(self, id) }
     fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> { C::display(self, id) }
+    fn dupe(&self) -> Box<Self> { Box::new(C::dupe(self)) }
 }
 
 /// A type representing a single line of a [`Source`].
@@ -159,6 +163,7 @@ impl Source {
 impl Cache<()> for Source {
     fn fetch(&mut self, _: &()) -> Result<&Source, Box<dyn fmt::Debug + '_>> { Ok(self) }
     fn display(&self, _: &()) -> Option<Box<dyn fmt::Display>> { None }
+    fn dupe(&self) -> Box<Self> { Box::new(self.clone()) }
 }
 
 impl<Id: fmt::Display + Eq> Cache<Id> for (Id, Source) {
@@ -166,6 +171,7 @@ impl<Id: fmt::Display + Eq> Cache<Id> for (Id, Source) {
         if id == &self.0 { Ok(&self.1) } else { Err(Box::new(format!("Failed to fetch source '{}'", id))) }
     }
     fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> { Some(Box::new(id)) }
+    fn dupe(&self) -> Box<Self> { todo!() }
 }
 
 /// A [`Cache`] that fetches [`Source`]s from the filesystem.
@@ -222,6 +228,8 @@ impl<Id: fmt::Display + Hash + PartialEq + Eq + Clone, F> Cache<Id> for FnCache<
         })
     }
     fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> { Some(Box::new(id)) }
+
+    fn dupe(&self) -> Box<Self> { todo!() }
 }
 
 /// Create a [`Cache`] from a collection of ID/strings, where each corresponds to a [`Source`].
