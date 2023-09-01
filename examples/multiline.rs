@@ -37,7 +37,7 @@ fn main() {
             ))
             .with_color(out2))
         .with_note(format!("Outputs of {} expressions must coerce to the same type", "match".fg(out)))
-        .finish()
-        .print(("sample.tao", Source::from(include_str!("sample.tao"))))
+        .finish(("sample.tao", Source::from(include_str!("sample.tao"))))
+        .print()
         .unwrap();
 }

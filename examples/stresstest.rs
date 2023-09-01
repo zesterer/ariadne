@@ -53,7 +53,7 @@ fn main() {
             .with_compact(true)
             .with_underlines(true)
             .with_tab_width(4))
-        .finish()
-        .print(("stresstest.tao", Source::from(include_str!("stresstest.tao"))))
+        .finish(("stresstest.tao", Source::from(include_str!("stresstest.tao"))))
+        .print()
         .unwrap();
 }

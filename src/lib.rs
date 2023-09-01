@@ -23,6 +23,7 @@ use std::{
     cmp::{PartialEq, Eq},
     fmt,
 };
+use std::fmt::Formatter;
 use unicode_width::UnicodeWidthChar;
 
 /// A trait implemented by spans within a character-based source.
@@ -152,6 +153,7 @@ pub struct Report<'a, S: Span = Range<usize>> {
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
     config: Config,
+    rendered: Option<String>
 }
 
 impl<S: Span> Report<'_, S> {
@@ -170,16 +172,23 @@ impl<S: Span> Report<'_, S> {
     }
 
     /// Write this diagnostic out to `stderr`.
-    pub fn eprint<C: Cache<S::SourceId>>(&self, cache: C) -> io::Result<()> {
-        self.write(cache, io::stderr())
+    pub fn eprint(&self) -> io::Result<()> {
+        write!(io::stderr(), "{}", self.rendered.as_ref().unwrap())
     }
 
     /// Write this diagnostic out to `stdout`.
     ///
     /// In most cases, [`Report::eprint`] is the
     /// ['more correct'](https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)) function to use.
-    pub fn print<C: Cache<S::SourceId>>(&self, cache: C) -> io::Result<()> {
-        self.write_for_stdout(cache, io::stdout())
+    pub fn print(&self) -> io::Result<()> {
+        write!(io::stdout(), "{}", self.rendered.as_ref().unwrap())
+    }
+
+    /// TODO: Move the description from the fork
+    fn write_to_string<C: Cache<S::SourceId>>(&self, cache: C) -> String {
+        let mut vec = Vec::new();
+        self.write(cache, &mut vec).unwrap();
+        String::from_utf8(vec).unwrap()
     }
 }
 
@@ -195,6 +204,21 @@ impl<'a, S: Span> fmt::Debug for Report<'a, S> {
             .finish()
     }
 }
+
+impl<'a, S: Span> fmt::Display for Report<'a, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        assert!(
+            self.rendered.is_some(),
+            "A report render is necessary to do display"
+        );
+
+        write!(f, "{}", self.rendered.as_ref().unwrap())
+    }
+}
+
+impl<'a, S: Span> std::error::Error for Report<'a, S> {}
+
+
 /// A type that defines the kind of report being produced.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReportKind<'a> {
@@ -303,8 +327,8 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     }
 
     /// Finish building the [`Report`].
-    pub fn finish(self) -> Report<'a, S> {
-        Report {
+    pub fn finish<C: Cache<S::SourceId>>(self, cache: C) -> Report<'a, S> {
+        let mut report = Report {
             kind: self.kind,
             code: self.code,
             msg: self.msg,
@@ -313,7 +337,11 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
             location: self.location,
             labels: self.labels,
             config: self.config,
-        }
+            rendered: None
+        };
+        report.rendered = Some(report.write_to_string(cache));
+
+        report
     }
 }
 

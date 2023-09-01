@@ -25,10 +25,10 @@ fn main() {
             .with_message(format!("Original definition of {} is here", "five".fg(a)))
             .with_color(a))
         .with_note(format!("{} is a number and can only be added to other numbers", "Nat".fg(a)))
-        .finish()
-        .print(sources(vec![
+        .finish(sources(vec![
             ("a.tao", include_str!("a.tao")),
             ("b.tao", include_str!("b.tao")),
         ]))
+        .print()
         .unwrap();
 }
