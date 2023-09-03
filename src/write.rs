@@ -762,7 +762,7 @@ impl<S: Span> Report<'_, S> {
                         writeln!(w)?;
                     }
                     let note_prefix = format!("{} {}", "Note", i + 1);
-                    let note_prefix_len = note_prefix.len();
+                    let note_prefix_len = if self.notes.len() > 1 { note_prefix.len() } else { 4 };
                     let mut lines = note.lines();
                     if let Some(line) = lines.next() {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
