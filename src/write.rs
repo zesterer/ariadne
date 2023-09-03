@@ -766,7 +766,11 @@ impl<S: Span> Report<'_, S> {
                     let mut lines = note.lines();
                     if let Some(line) = lines.next() {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        writeln!(w, "{}: {}", note_prefix.fg(self.config.note_color(), s), line)?;                        
+                        if self.notes.len() > 1 {
+                            writeln!(w, "{}: {}", note_prefix.fg(self.config.note_color(), s), line)?;
+                        } else {
+                            writeln!(w, "{}: {}", "Note".fg(self.config.note_color(), s), line)?;
+                        }
                     }
                     for line in lines {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
