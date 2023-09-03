@@ -755,13 +755,24 @@ impl<S: Span> Report<'_, S> {
             }
 
             // Note
-            if let (Some(note), true) = (&self.note, is_final_group) {
-                if !self.config.compact {
-                    write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                    write!(w, "\n")?;
+            if is_final_group {
+                for (i, note) in self.notes.iter().enumerate() {
+                    if !self.config.compact {
+                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        writeln!(w)?;
+                    }
+                    let note_prefix = format!("{} {}", "Note", i + 1);
+                    let note_prefix_len = note_prefix.len();
+                    let mut lines = note.lines();
+                    if let Some(line) = lines.next() {
+                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        writeln!(w, "{}: {}", note_prefix.fg(self.config.note_color(), s), line)?;                        
+                    }
+                    for line in lines {
+                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        writeln!(w, "{:>pad$}{}", "", line, pad=note_prefix_len+2)?;
+                    }
                 }
-                write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                write!(w, "{}: {}\n", "Note".fg(self.config.note_color(), s), note)?;
             }
 
             // Tail of report
