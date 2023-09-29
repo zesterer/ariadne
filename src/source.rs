@@ -68,7 +68,7 @@ impl Line {
 ///
 /// In most cases, a source is a single input file.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Source<I: AsRef<str>> {
+pub struct Source<I: AsRef<str> = String> {
     text: I,
     lines: Vec<Line>,
     len: usize,
@@ -210,13 +210,13 @@ impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, Source<I>) {
 /// A [`Cache`] that fetches [`Source`]s from the filesystem.
 #[derive(Default, Debug, Clone)]
 pub struct FileCache {
-    files: HashMap<PathBuf, Source<String>>,
+    files: HashMap<PathBuf, Source>,
 }
 
 impl Cache<Path> for FileCache {
     type Storage = String;
 
-    fn fetch(&mut self, path: &Path) -> Result<&Source<String>, Box<dyn fmt::Debug + '_>> {
+    fn fetch(&mut self, path: &Path) -> Result<&Source, Box<dyn fmt::Debug + '_>> {
         Ok(match self.files.entry(path.to_path_buf()) { // TODO: Don't allocate here
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(Source::from(fs::read_to_string(path).map_err(|e| Box::new(e) as _)?)),
