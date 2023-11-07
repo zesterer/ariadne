@@ -156,7 +156,7 @@ impl<I: AsRef<str>> Source<I> {
                 .lines
                 .binary_search_by_key(&offset, |line| line.offset)
                 .unwrap_or_else(|idx| idx.saturating_sub(1));
-            let line = self.lines[idx];
+            let line = self.line(idx)?;
             assert!(
                 offset >= line.offset,
                 "offset = {}, line.offset = {}",
