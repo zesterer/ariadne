@@ -439,6 +439,18 @@ impl<S: Span> Report<'_, S> {
                     })
                     .min_by_key(|ll| (ll.col, !ll.label.span.start()));
 
+                // Generate a list of color spans for this line
+                let mut color_spans = self.color_spans.iter().filter_map(|(span, color)| {
+                    if span.source() != src_id {
+                        return None;
+                    }
+                    if span.start() >= line.span().start && span.end() <= line.span().end {
+                        Some((span.start() - line.offset(), span.end() - line.offset(), *color))
+                    } else {
+                        None
+                    }
+                }).collect::<Vec<_>>();
+
                 // Generate a list of labels for this line, along with their label columns
                 let mut line_labels = multi_labels_with_message
                     .iter()
@@ -545,6 +557,14 @@ impl<S: Span> Report<'_, S> {
                 };
 
                 let get_highlight = |col| {
+                    if let Some(color_span) = color_spans
+                        .iter()
+                        .filter(|(start, end, _)| *start <= col && *end > col)
+                        .map(|(start, end, c)| (c, end - start))
+                        .min_by_key(|(_, len)| *len)
+                        .map(|(c, len)| *c) {
+                            return Some(color_span)
+                        }
                     margin_label
                         .iter()
                         .map(|ll| ll.label)
@@ -553,6 +573,7 @@ impl<S: Span> Report<'_, S> {
                         .filter(|l| l.span.contains(line.offset() + col))
                         // Prioritise displaying smaller spans
                         .min_by_key(|l| (-l.priority, l.span.len()))
+                        .and_then(|l| l.color)
                 };
 
                 let get_underline = |col| {
@@ -583,11 +604,7 @@ impl<S: Span> Report<'_, S> {
                 // Line
                 if !is_ellipsis {
                     for (col, c) in src.get_line_text(line).unwrap().chars().enumerate() {
-                        let color = if let Some(highlight) = get_highlight(col) {
-                            highlight.color
-                        } else {
-                            self.config.unimportant_color()
-                        };
+                        let color = get_highlight(col).map_or(self.config.unimportant_color(), Some);
                         let (c, width) = self.config.char_width(c, col);
                         if c.is_whitespace() {
                             for _ in 0..width {
