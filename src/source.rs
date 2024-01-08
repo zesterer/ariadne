@@ -74,6 +74,13 @@ pub struct Source<I: AsRef<str> = String> {
     len: usize,
 }
 
+impl<I: AsRef<str>> Source<I> {
+    /// Get the full text of this source file.
+    pub fn text(&self) -> &str {
+        self.text.as_ref()
+    }
+}
+
 impl<I: AsRef<str>> From<I> for Source<I> {
     /// Generate a [`Source`] from the given [`str`].
     ///
