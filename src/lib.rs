@@ -151,7 +151,6 @@ pub struct Report<'a, S: Span = Range<usize>> {
     help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
-    color_spans: Vec<(S, Color)>,
     config: Config,
 }
 
@@ -166,7 +165,6 @@ impl<S: Span> Report<'_, S> {
             help: None,
             location: (src_id.into(), offset),
             labels: Vec::new(),
-            color_spans: Vec::new(),
             config: Config::default(),
         }
     }
@@ -232,7 +230,6 @@ pub struct ReportBuilder<'a, S: Span> {
     help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
-    color_spans: Vec<(S, Color)>,
     config: Config,
 }
 
@@ -299,29 +296,6 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
         self
     }
 
-    /// Add a colored span to the report.
-    pub fn add_colored_span(&mut self, span: S, color: Color) {
-        self.add_colored_spans(std::iter::once((span, color)));
-    }
-    
-    /// Add multiple colored spans to the report.
-    pub fn add_colored_spans<L: IntoIterator<Item = (S, Color)>>(&mut self, spans: L) {
-        let config = &self.config; // This would not be necessary in Rust 2021 edition
-        self.color_spans.extend(spans.into_iter().map(|(span, color)| (span, config.filter_color(Some(color)).unwrap_or(color))));
-    }
-
-    /// Add a colored span to the report.
-    pub fn with_colored_span(mut self, span: S, color: Color) -> Self {
-        self.add_colored_span(span, color);
-        self
-    }
-
-    /// Add multiple colored spans to the report.
-    pub fn with_colored_spans<L: IntoIterator<Item = (S, Color)>>(mut self, spans: L) -> Self {
-        self.add_colored_spans(spans);
-        self
-    }
-
     /// Use the given [`Config`] to determine diagnostic attributes.
     pub fn with_config(mut self, config: Config) -> Self {
         self.config = config;
@@ -338,7 +312,6 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
             help: self.help,
             location: self.location,
             labels: self.labels,
-            color_spans: self.color_spans,
             config: self.config,
         }
     }

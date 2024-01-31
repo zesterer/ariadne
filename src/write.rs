@@ -440,12 +440,15 @@ impl<S: Span> Report<'_, S> {
                     .min_by_key(|ll| (ll.col, !ll.label.span.start()));
 
                 // Generate a list of color spans for this line
-                let mut color_spans = self.color_spans.iter().filter_map(|(span, color)| {
-                    if span.source() != src_id {
+                let color_spans = self.labels.iter().filter_map(|label| {
+                    if label.msg.is_some() {
+                        return None;
+                    }
+                    if label.span.source() != src_id {
                         return None;
                     }
                     if span.start() >= line.span().start && span.end() <= line.span().end {
-                        Some((span.start() - line.offset(), span.end() - line.offset(), *color))
+                        Some((span.start() - line.offset(), span.end() - line.offset(), label.color))
                     } else {
                         None
                     }
@@ -456,6 +459,9 @@ impl<S: Span> Report<'_, S> {
                     .iter()
                     .enumerate()
                     .filter_map(|(_i, label)| {
+                        if label.msg.is_none() {
+                            return None;
+                        }
                         let is_start = line.span().contains(&label.span.start());
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start
@@ -562,8 +568,8 @@ impl<S: Span> Report<'_, S> {
                         .filter(|(start, end, _)| *start <= col && *end > col)
                         .map(|(start, end, c)| (c, end - start))
                         .min_by_key(|(_, len)| *len)
-                        .map(|(c, len)| *c) {
-                            return Some(color_span)
+                        .map(|(c, _len)| *c) {
+                            return color_span
                         }
                     margin_label
                         .iter()
