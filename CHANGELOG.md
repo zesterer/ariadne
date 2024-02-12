@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking changes
 
+### Added
+
+### Removed
+
+### Changed
+
+### Fixed
+
+# [0.4.0] - 2023-01-01
+
+### Breaking changes
+
 - Added missing `S: Span` bound for `Label::new` constructor.
 
 - Previously labels with backwards spans could be constructed and
@@ -17,11 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-### Removed
+- Support for alternative string-like types in `Source`
 
 ### Changed
 
+- Memory & performance improvements
+
 ### Fixed
+
+- Panic when provided with an empty input
+
+- Invalid unicode characters for certain arrows
 
 # [0.3.0] - 2023-06-07
 

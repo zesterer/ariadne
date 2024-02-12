@@ -36,7 +36,7 @@ impl Characters {
             xbar: '┼',
             vbar_break: '┆',
             vbar_gap: '┆',
-            uarrow: '🭯',
+            uarrow: '▲',
             rarrow: '▶',
             ltop: '╭',
             mtop: '┬',
