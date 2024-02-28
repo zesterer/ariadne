@@ -68,14 +68,20 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, Range<usize
     fn end(&self) -> usize { self.1.end }
 }
 
-/// A type that represents a labelled section of source code.
+/// A type that represents the way a label should be displayed.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Label<S = Range<usize>> {
-    span: S,
+struct LabelDisplay {
     msg: Option<String>,
     color: Option<Color>,
     order: i32,
     priority: i32,
+}
+
+/// A type that represents a labelled section of source code.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Label<S = Range<usize>> {
+    span: S,
+    display_info: LabelDisplay,
 }
 
 impl<S: Span> Label<S> {
@@ -93,22 +99,24 @@ impl<S: Span> Label<S> {
 
         Self {
             span,
-            msg: None,
-            color: None,
-            order: 0,
-            priority: 0,
+            display_info: LabelDisplay{
+                msg: None,
+                color: None,
+                order: 0,
+                priority: 0,
+            }
         }
     }
 
     /// Give this label a message.
     pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
-        self.msg = Some(msg.to_string());
+        self.display_info.msg = Some(msg.to_string());
         self
     }
 
     /// Give this label a highlight colour.
     pub fn with_color(mut self, color: Color) -> Self {
-        self.color = Some(color);
+        self.display_info.color = Some(color);
         self
     }
 
@@ -123,7 +131,7 @@ impl<S: Span> Label<S> {
     /// Additionally, multi-line labels are ordered before inline labels. You can use this function to override this
     /// behaviour.
     pub fn with_order(mut self, order: i32) -> Self {
-        self.order = order;
+        self.display_info.order = order;
         self
     }
 
@@ -137,7 +145,7 @@ impl<S: Span> Label<S> {
     /// purposes such as highlighting. By default, spans with a smaller length get a higher priority. You can use this
     /// function to override this behaviour.
     pub fn with_priority(mut self, priority: i32) -> Self {
-        self.priority = priority;
+        self.display_info.priority = priority;
         self
     }
 }
@@ -281,7 +289,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     /// Add multiple labels to the report.
     pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) {
         let config = &self.config; // This would not be necessary in Rust 2021 edition
-        self.labels.extend(labels.into_iter().map(|mut label| { label.color = config.filter_color(label.color); label }));
+        self.labels.extend(labels.into_iter().map(|mut label| { label.display_info.color = config.filter_color(label.display_info.color); label }));
     }
 
     /// Add a label to the report.
