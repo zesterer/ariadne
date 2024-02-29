@@ -358,6 +358,15 @@ pub enum CharSet {
     Ascii,
 }
 
+/// Possible character sets to use when rendering diagnostics.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum IndexType {
+    /// Byte spans. Always results in O(1) loopups
+    Byte,
+    /// Char based spans. May incur O(n) lookups
+    Char,
+}
+
 /// A type used to configure a report
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Config {
@@ -369,6 +378,7 @@ pub struct Config {
     color: bool,
     tab_width: usize,
     char_set: CharSet,
+    index_type : IndexType,
 }
 
 impl Config {
@@ -406,6 +416,10 @@ impl Config {
     ///
     /// If unspecified, this defaults to [`CharSet::Unicode`].
     pub fn with_char_set(mut self, char_set: CharSet) -> Self { self.char_set = char_set; self }
+    /// Should this report use byte spans instead of char spans?
+    ///
+    /// If unspecified, this defaults to 'false'
+    pub fn with_index_type(mut self, index_type : IndexType) -> Self { self.index_type = index_type; self }
 
     fn error_color(&self) -> Option<Color> { Some(Color::Red).filter(|_| self.color) }
     fn warning_color(&self) -> Option<Color> { Some(Color::Yellow).filter(|_| self.color) }
@@ -441,6 +455,7 @@ impl Default for Config {
             color: true,
             tab_width: 4,
             char_set: CharSet::Unicode,
+            index_type: IndexType::Char,
         }
     }
 }
