@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::io;
 use std::ops::Range;
 
-use crate::LabelDisplay;
+use crate::{IndexType, LabelDisplay};
 
 use super::draw::{self, StreamAwareFmt, StreamType};
 use super::{Cache, CharSet, LabelAttach, Report, ReportKind, Show, Span, Write};
@@ -42,8 +42,10 @@ impl<S: Span> Report<'_, S> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
         let mut groups = Vec::new();
         for label in self.labels.iter() {
-            let src_display = cache.display(label.span.source());
-            let src = match cache.fetch(label.span.source()) {
+            let label_source = label.span.source();
+
+            let src_display = cache.display(label_source);
+            let src = match cache.fetch(label_source) {
                 Ok(src) => src,
                 Err(e) => {
                     eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), e);
@@ -51,10 +53,41 @@ impl<S: Span> Report<'_, S> {
                 }
             };
 
-            let start_line = src.get_offset_line(label.span.start()).map(|(_, l, _)| l);
-            let end_line = src
-                .get_offset_line(label.span.end().saturating_sub(1).max(label.span.start()))
-                .map(|(_, l, _)| l);
+            let given_label_span = label.span.start()..label.span.end();
+
+            let (label_char_span, start_line, end_line) = match self.config.index_type {
+                IndexType::Char => {
+                    let Some(start_line) = src.get_offset_line(given_label_span.start) else {continue};
+                    let end_line = if given_label_span.start >= given_label_span.end {
+                        start_line.1
+                    } else {
+                        let Some(end_line) = src.get_offset_line(given_label_span.end - 1) else {continue};
+                        end_line.1
+                    };
+                    (given_label_span, start_line.1, end_line)
+                },
+                IndexType::Byte => {
+                    let Some((start_line_obj, start_line, start_byte_col)) = src.get_byte_line(given_label_span.start) else {continue;};
+                    let line_text = src.get_line_text(start_line_obj).unwrap();
+
+                    let num_chars_before_start = line_text[..start_byte_col].chars().count();
+                    let start_char_offset = start_line_obj.offset() + num_chars_before_start;
+
+                    if given_label_span.start >= given_label_span.end {
+                        (start_char_offset..start_char_offset, start_line, start_line)
+                    } else {
+                        // We can subtract 1 from end, because get_byte_line doesn't actually index into the text. 
+                        let end_pos = given_label_span.end - 1;
+                        let Some((end_line_obj, end_line, end_byte_col)) = src.get_byte_line(end_pos) else {continue};
+                        let end_line_text = src.get_line_text(start_line_obj).unwrap();
+                        // Have to add 1 back now, so we don't cut a char in two. 
+                        let num_chars_before_end = end_line_text[..end_byte_col+1].chars().count();
+                        let end_char_offset = end_line_obj.offset() + num_chars_before_end;
+
+                        (start_char_offset..end_char_offset, start_line, end_line)
+                    }
+                }
+            };
 
             let label_info = LabelInfo {
                 kind: if start_line == end_line {
@@ -62,20 +95,20 @@ impl<S: Span> Report<'_, S> {
                 } else {
                     LabelKind::Multiline
                 },
-                char_span: label.span.start()..label.span.end(),
+                char_span: label_char_span,
                 display_info: &label.display_info,
             };
 
             if let Some(group) = groups
                 .iter_mut()
-                .find(|g: &&mut SourceGroup<S>| g.src_id == label.span.source())
+                .find(|g: &&mut SourceGroup<S>| g.src_id == label_source)
             {
                 group.char_span.start = group.char_span.start.min(label_info.char_span.start);
                 group.char_span.end = group.char_span.end.max(label_info.char_span.end);
                 group.labels.push(label_info);
             } else {
                 groups.push(SourceGroup {
-                    src_id: label.span.source(),
+                    src_id: label_source,
                     char_span: label_info.char_span.clone(),
                     labels: vec![label_info],
                 });
@@ -807,7 +840,7 @@ mod tests {
 
     use insta::assert_snapshot;
 
-    use crate::{Cache, CharSet, Config, Label, Report, ReportKind, Source, Span};
+    use crate::{Cache, CharSet, Config, Label, Report, ReportKind, Source, Span, IndexType};
 
     impl<S: Span> Report<'_, S> {
         fn write_to_string<C: Cache<S::SourceId>>(&self, cache: C) -> String {
@@ -877,6 +910,54 @@ mod tests {
            |   `-------------- This is an apple
            |             |    
            |             `---- This is an orange
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn multi_byte_chars() {
+        let source = "äpplë == örängë;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii().with_index_type(IndexType::Char))
+            .with_message("can't compare äpplës with örängës")
+            .with_label(Label::new(0..5).with_message("This is an äpplë"))
+            .with_label(Label::new(9..15).with_message("This is an örängë"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if these lines didn't cross
+        assert_snapshot!(msg, @r###"
+        Error: can't compare äpplës with örängës
+           ,-[<unknown>:1:1]
+           |
+         1 | äpplë == örängë;
+           | ^^|^^    ^^^|^^  
+           |   `-------------- This is an äpplë
+           |             |    
+           |             `---- This is an örängë
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn byte_label() {
+        let source = "äpplë == örängë;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+            .with_message("can't compare äpplës with örängës")
+            .with_label(Label::new(0..7).with_message("This is an äpplë"))
+            .with_label(Label::new(11..20).with_message("This is an örängë"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if these lines didn't cross
+        assert_snapshot!(msg, @r###"
+        Error: can't compare äpplës with örängës
+           ,-[<unknown>:1:1]
+           |
+         1 | äpplë == örängë;
+           | ^^|^^    ^^^|^^  
+           |   `-------------- This is an äpplë
+           |             |    
+           |             `---- This is an örängë
         ---'
         "###);
     }
