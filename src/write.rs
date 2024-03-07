@@ -70,7 +70,9 @@ impl<S: Span> Report<'_, S> {
                     let Some((start_line_obj, start_line, start_byte_col)) = src.get_byte_line(given_label_span.start) else {continue;};
                     let line_text = src.get_line_text(start_line_obj).unwrap();
 
-                    let num_chars_before_start = line_text[..start_byte_col].chars().count();
+                    let num_chars_before_start = line_text[..start_byte_col.min(line_text.len())]
+                        .chars()
+                        .count();
                     let start_char_offset = start_line_obj.offset() + num_chars_before_start;
 
                     if given_label_span.start >= given_label_span.end {
@@ -981,6 +983,27 @@ mod tests {
          1 | apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^^|^^  
            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        `---- This is an orange
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn label_of_width_zero_at_end_of_line() {
+        let source = "apple ==\n";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+            .with_message("unexpected end of file")
+            .with_label(Label::new(9..9).with_message("Unexpected end of file"))
+            .finish()
+            .write_to_string(Source::from(source));
+
+        assert_snapshot!(msg, @r###"
+        Error: unexpected end of file
+           ,-[<unknown>:1:1]
+           |
+         1 | apple ==
+           |         | 
+           |         `- Unexpected end of file
         ---'
         "###);
     }
