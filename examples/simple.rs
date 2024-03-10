@@ -1,5 +1,4 @@
-use yansi::Color;
-use ariadne::{Report, ReportKind, Label, Source, Config};
+use ariadne::{Report, ReportKind, Label, Source, Config, Color};
 
 fn main() {
     Report::build(ReportKind::Error, (), 34)
