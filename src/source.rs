@@ -244,18 +244,17 @@ pub struct FileCache {
     files: HashMap<PathBuf, Source>,
 }
 
-impl Cache<Path> for FileCache {
+impl Cache<&Path> for FileCache {
     type Storage = String;
 
-    fn fetch(&mut self, path: &Path) -> Result<&Source, Box<dyn fmt::Debug + '_>> {
+    fn fetch(&mut self, path: &&Path) -> Result<&Source, Box<dyn fmt::Debug + '_>> {
         Ok(match self.files.entry(path.to_path_buf()) { // TODO: Don't allocate here
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(Source::from(fs::read_to_string(path).map_err(|e| Box::new(e) as _)?)),
         })
     }
-    fn display<'a>(&self, path: &'a Path) -> Option<Box<dyn fmt::Display + 'a>> { Some(Box::new(path.display())) }
+    fn display<'a>(&self, path: &&'a Path) -> Option<Box<dyn fmt::Display + 'a>> { Some(Box::new(path.display())) }
 }
-
 /// A [`Cache`] that fetches [`Source`]s using the provided function.
 #[derive(Debug, Clone)]
 pub struct FnCache<Id, F, I>
