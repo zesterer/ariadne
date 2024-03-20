@@ -217,20 +217,49 @@ impl<T: fmt::Display> fmt::Display for Background<T> {
 
 /// A type that can generate distinct 8-bit colors.
 pub struct ColorGenerator {
-    state: [u16; 3],
+    state: [u16; Self::MAX_AMOUNT_STATES],
     min_brightness: f32,
 }
 
 impl Default for ColorGenerator {
-    fn default() -> Self { Self::from_state([30000, 15000, 35000], 0.5) }
+    fn default() -> Self {
+        Self::from_state(
+            [
+                Self::DEFAULT_MIN_COLOR,
+                Self::DEFAULT_COLOR_STEP,
+                Self::DEFAULT_MAX_COLOR,
+            ],
+            Self::DEFAULT_BRIGHTNESS,
+        )
+    }
 }
 
 impl ColorGenerator {
+    /// the minimal possible brightness value
+    pub const MIN_BRIGHTNESS_VALUE: f32 = 0.0;
+
+    /// the maximal possible brightness value
+    pub const MAX_BRIGHTNESS_VALUE: f32 = 1.0;
+
+    /// the default brightness
+    pub const DEFAULT_BRIGHTNESS: f32 = 0.5;
+
+    const MAX_AMOUNT_STATES: usize = 3;
+
+    const DEFAULT_MIN_COLOR: u16 = 30_000;
+    const DEFAULT_COLOR_STEP: u16 = 15_000;
+    const DEFAULT_MAX_COLOR: u16 = 35_000;
+
     /// Create a new [`ColorGenerator`] with the given pre-chosen state.
     ///
     /// The minimum brightness can be used to control the colour brightness (0.0 - 1.0). The default is 0.5.
-    pub fn from_state(state: [u16; 3], min_brightness: f32) -> Self {
-        Self { state, min_brightness: min_brightness.max(0.0).min(1.0) }
+    pub fn from_state(state: [u16; Self::MAX_AMOUNT_STATES], min_brightness: f32) -> Self {
+        Self {
+            state,
+            min_brightness: min_brightness
+                .max(Self::MIN_BRIGHTNESS_VALUE)
+                .min(Self::MAX_BRIGHTNESS_VALUE),
+        }
     }
 
     /// Create a new [`ColorGenerator`] with the default state.
@@ -240,13 +269,23 @@ impl ColorGenerator {
 
     /// Generate the next colour in the sequence.
     pub fn next(&mut self) -> Color {
-        for i in 0..3 {
+        for i in 0..Self::MAX_AMOUNT_STATES {
             // magic constant, one of only two that have this property!
             self.state[i] = (self.state[i] as usize).wrapping_add(40503 * (i * 4 + 1130)) as u16;
         }
-        Color::Fixed(16
-            + ((self.state[2] as f32 / 65535.0 * (1.0 - self.min_brightness) + self.min_brightness) * 5.0
-            + (self.state[1] as f32 / 65535.0 * (1.0 - self.min_brightness) + self.min_brightness) * 30.0
-            + (self.state[0] as f32 / 65535.0 * (1.0 - self.min_brightness) + self.min_brightness) * 180.0) as u8)
+        Color::Fixed(
+            16 + ((self.state[2] as f32 / 65535.0
+                * (Self::MAX_BRIGHTNESS_VALUE - self.min_brightness)
+                + self.min_brightness)
+                * 5.0
+                + (self.state[1] as f32 / 65535.0
+                    * (Self::MAX_BRIGHTNESS_VALUE - self.min_brightness)
+                    + self.min_brightness)
+                    * 30.0
+                + (self.state[0] as f32 / 65535.0
+                    * (Self::MAX_BRIGHTNESS_VALUE - self.min_brightness)
+                    + self.min_brightness)
+                    * 180.0) as u8,
+        )
     }
 }
