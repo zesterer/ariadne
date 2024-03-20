@@ -155,7 +155,7 @@ pub struct Report<'a, S: Span = Range<usize>> {
     kind: ReportKind<'a>,
     code: Option<String>,
     msg: Option<String>,
-    note: Option<String>,
+    notes: Vec<String>,
     help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
@@ -169,7 +169,7 @@ impl<S: Span> Report<'_, S> {
             kind,
             code: None,
             msg: None,
-            note: None,
+            notes: vec![],
             help: None,
             location: (src_id.into(), offset),
             labels: Vec::new(),
@@ -197,7 +197,7 @@ impl<'a, S: Span> fmt::Debug for Report<'a, S> {
             .field("kind", &self.kind)
             .field("code", &self.code)
             .field("msg", &self.msg)
-            .field("note", &self.note)
+            .field("notes", &self.notes)
             .field("help", &self.help)
             .field("config", &self.config)
             .finish()
@@ -234,7 +234,7 @@ pub struct ReportBuilder<'a, S: Span> {
     kind: ReportKind<'a>,
     code: Option<String>,
     msg: Option<String>,
-    note: Option<String>,
+    notes: Vec<String>,
     help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
@@ -261,12 +261,24 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
 
     /// Set the note of this report.
     pub fn set_note<N: ToString>(&mut self, note: N) {
-        self.note = Some(note.to_string());
+        self.notes = vec![note.to_string()];
+    }
+
+    /// Adds a note to this report.
+    pub fn add_note<N: ToString>(&mut self, note: N) {
+        self.notes.push(note.to_string());
+    }
+
+    /// Removes all notes in this report.
+    pub fn with_notes<N: IntoIterator<Item = impl ToString>>(&mut self, notes: N) {
+        for note in notes {
+            self.add_note(note)
+        }
     }
 
     /// Set the note of this report.
     pub fn with_note<N: ToString>(mut self, note: N) -> Self {
-        self.set_note(note);
+        self.add_note(note);
         self
     }
 
@@ -316,7 +328,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
             kind: self.kind,
             code: self.code,
             msg: self.msg,
-            note: self.note,
+            notes: self.notes,
             help: self.help,
             location: self.location,
             labels: self.labels,
@@ -331,7 +343,7 @@ impl<'a, S: Span> fmt::Debug for ReportBuilder<'a, S> {
             .field("kind", &self.kind)
             .field("code", &self.code)
             .field("msg", &self.msg)
-            .field("note", &self.note)
+            .field("notes", &self.notes)
             .field("help", &self.help)
             .field("config", &self.config)
             .finish()
