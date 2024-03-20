@@ -5,8 +5,10 @@ mod source;
 mod display;
 mod draw;
 mod write;
+mod caused_by;
 
 pub use crate::{
+    caused_by::{CausedBy, CausedByFrame, CausedByConfig},
     source::{Line, Source, Cache, FileCache, FnCache, sources},
     draw::{Fmt, ColorGenerator},
 };
@@ -159,6 +161,7 @@ pub struct Report<'a, S: Span = Range<usize>> {
     help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
+    backtrace: CausedBy,
     config: Config,
 }
 
@@ -173,6 +176,7 @@ impl<S: Span> Report<'_, S> {
             help: None,
             location: (src_id.into(), offset),
             labels: Vec::new(),
+            backtrace: CausedBy::default(),
             config: Config::default(),
         }
     }
@@ -238,6 +242,7 @@ pub struct ReportBuilder<'a, S: Span> {
     help: Option<String>,
     location: (<S::SourceId as ToOwned>::Owned, usize),
     labels: Vec<Label<S>>,
+    backtrace: CausedBy,
     config: Config,
 }
 
@@ -291,7 +296,11 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
         let config = &self.config; // This would not be necessary in Rust 2021 edition
         self.labels.extend(labels.into_iter().map(|mut label| { label.display_info.color = config.filter_color(label.display_info.color); label }));
     }
-
+    /// add a new backtrace frame to the report
+    pub fn push_backtrace(mut self, trace: CausedByFrame) -> Self {
+        self.backtrace.push_frame(trace);
+        self
+    }
     /// Add a label to the report.
     pub fn with_label(mut self, label: Label<S>) -> Self {
         self.add_label(label);
@@ -320,6 +329,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
             help: self.help,
             location: self.location,
             labels: self.labels,
+            backtrace: self.backtrace,
             config: self.config,
         }
     }
