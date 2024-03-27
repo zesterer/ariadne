@@ -81,7 +81,7 @@ impl<S: Span> Report<'_, S> {
                         // We can subtract 1 from end, because get_byte_line doesn't actually index into the text. 
                         let end_pos = given_label_span.end - 1;
                         let Some((end_line_obj, end_line, end_byte_col)) = src.get_byte_line(end_pos) else {continue};
-                        let end_line_text = src.get_line_text(start_line_obj).unwrap();
+                        let end_line_text = src.get_line_text(end_line_obj).unwrap();
                         // Have to add 1 back now, so we don't cut a char in two. 
                         let num_chars_before_end = end_line_text[..end_byte_col+1].chars().count();
                         let end_char_offset = end_line_obj.offset() + num_chars_before_end;
