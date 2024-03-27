@@ -1012,8 +1012,8 @@ mod tests {
     fn byte_spans_never_crash() {
         let source = "apple\np\n\nempty\n";
 
-        for i in 0..source.len() {
-            for j in i..source.len() {
+        for i in 0..=source.len() {
+            for j in i..=source.len() {
                 let _ = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
                     .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
                     .with_message("Label")
