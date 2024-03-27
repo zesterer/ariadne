@@ -627,7 +627,7 @@ impl<S: Span> Report<'_, S> {
 
                 // Line
                 if !is_ellipsis {
-                    for (col, c) in src.get_line_text(line).unwrap().chars().enumerate() {
+                    for (col, c) in src.get_line_text(line).unwrap().trim_end().chars().enumerate() {
                         let color = if let Some(highlight) = get_highlight(col) {
                             highlight.display_info.color
                         } else {
@@ -665,7 +665,7 @@ impl<S: Span> Report<'_, S> {
                             &margin_label,
                         )?;
                         // Lines alternate
-                        let mut chars = src.get_line_text(line).unwrap().chars();
+                        let mut chars = src.get_line_text(line).unwrap().trim_end().chars();
                         for col in 0..arrow_len {
                             let width =
                                 chars.next().map_or(1, |c| self.config.char_width(c, col).1);
@@ -719,7 +719,7 @@ impl<S: Span> Report<'_, S> {
                         &margin_label,
                     )?;
                     // Lines
-                    let mut chars = src.get_line_text(line).unwrap().chars();
+                    let mut chars = src.get_line_text(line).unwrap().trim_end().chars();
                     for col in 0..arrow_len {
                         let width = chars.next().map_or(1, |c| self.config.char_width(c, col).1);
 
@@ -1002,10 +1002,26 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple ==
-           |         | 
-           |         `- Unexpected end of file
+           |          | 
+           |          `- Unexpected end of file
         ---'
         "###);
+    }
+
+    #[test]
+    fn byte_spans_never_crash() {
+        let source = "apple\np\n\nempty\n";
+
+        for i in 0..source.len() {
+            for j in i..source.len() {
+                let _ = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+                    .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                    .with_message("Label")
+                    .with_label(Label::new(i..j).with_message("Label"))
+                    .finish()
+                    .write_to_string(Source::from(source));
+            }
+        }
     }
 
     #[test]

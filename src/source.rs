@@ -212,9 +212,9 @@ impl<I: AsRef<str>> Source<I> {
         start..end
     }
 
-    /// Get the source text for a line, excluding trailing whitespace.
+    /// Get the source text for a line, includes trailing whitespace and the newline
     pub fn get_line_text(&self, line: Line) -> Option<&'_ str> {
-        self.text.as_ref().get(line.byte_span()).map(|text| text.trim_end())
+        self.text.as_ref().get(line.byte_span())
     }
 }
 
@@ -335,7 +335,7 @@ mod tests {
             assert_eq!(source_line.char_len, raw_line.chars().count());
             assert_eq!(
                 source.get_line_text(source_line).unwrap(),
-                raw_line.trim_end()
+                raw_line
             );
             offset += source_line.char_len;
         }
@@ -398,7 +398,7 @@ mod tests {
             assert_eq!(source_line.char_len, raw_line.chars().count());
             assert_eq!(
                 source.get_line_text(source_line).unwrap(),
-                raw_line.trim_end()
+                raw_line
             );
             offset += source_line.char_len;
         }
