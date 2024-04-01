@@ -1,30 +1,31 @@
 use super::*;
-use core::{fmt, cell::RefCell};
+use core::fmt;
 
-impl<S> Diagnostic<S> {
-    pub fn display<F>(&self, files: F) -> Display<F, S>
+impl<K> Diagnostic<K> {
+    pub fn display<'a, F>(&'a self, files: F) -> Display<'a, F, K>
     where
-        S: Span,
-        F: Files<S::FileId>,
+        F: Files<'a, K>,
     {
-        Display { d: self, files: RefCell::new(files) }
+        Display { d: self, files }
     }
 }
 
-pub struct Display<'a, F, S = ByteSpan> {
-    d: &'a Diagnostic<S>,
+pub struct Display<'a, F, K = ()>
+where
+    F: Files<'a, K>,
+{
+    d: &'a Diagnostic<K>,
     // `RefCell` required because `fmt::Display::fmt` takes `&self`.
-    files: RefCell<F>,
+    files: F,
 }
 
-impl<'a, F, S> fmt::Display for Display<'a, F, S>
+impl<'a, F, K> fmt::Display for Display<'a, F, K>
 where
-    S: Span,
-    F: Files<S::FileId>,
+    F: Files<'a, K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Self { d, files } = self;
-        let mut files = self.files.borrow_mut();
+        let mut file_cache = files.init_cache();
 
         // Header
 
@@ -41,26 +42,27 @@ where
         }
 
         for label in &d.labels {
-            match files.fetch_filename(label.span.file_id()) {
-                Ok(None) => {},
-                Ok(Some(fname)) => writeln!(f, "in {}:", fname.borrow())?,
+            match files.fetch_filename(&mut file_cache, &label.file_id) {
+                Ok(None) => {}
+                Ok(Some(fname)) => writeln!(f, "in {}:", fname)?,
                 Err(_) => writeln!(f, "in <unknown>:")?,
             }
 
-            match files.fetch_file(label.span.file_id()) {
-                Ok(file) => file
-                    .borrow()
-                    .lines_of(&label.span)
-                    .map(|(i, l)| {
-                        write!(f, "{:>3} | ", i + 1);
-                        write_line(f, l)?;
-                        writeln!(f, "")?;
-                        write!(f, "    | ")?;
-                        write_span(f, (file.borrow().lines[i].0.start, l), label.span.byte_range(file.borrow()))?;
-                        writeln!(f, "")?;
-                        Ok(())
-                    })
-                    .collect::<Result<_, _>>()?,
+            match files.fetch_file(&mut file_cache, &label.file_id) {
+                Ok(file) => {
+                    let run = file.offsets_to_run(&label.offsets);
+                    file.lines_of(run)
+                        .map(|(line, s)| {
+                            write!(f, "{:>3} | ", line + 1)?;
+                            write_line(f, s)?;
+                            writeln!(f, "")?;
+                            write!(f, "    | ")?;
+                            write_span(f, line, s, run)?;
+                            writeln!(f, "")?;
+                            Ok(())
+                        })
+                        .collect::<Result<_, _>>()?;
+                }
                 Err(_) => writeln!(f, "<cannot fetch file>")?,
             }
         }
@@ -77,10 +79,10 @@ fn canonicalize(c: char) -> Option<Result<char, &'static str>> {
     }
 }
 
-fn write_line(f: &mut fmt::Formatter, l: &str) -> fmt::Result {
-    for c in l.chars() {
+fn write_line(f: &mut fmt::Formatter, s: &str) -> fmt::Result {
+    for c in s.chars() {
         match canonicalize(c) {
-            None => {},
+            None => {}
             Some(Err(s)) => write!(f, "{s}")?,
             Some(Ok(c)) => write!(f, "{c}")?,
         }
@@ -88,15 +90,15 @@ fn write_line(f: &mut fmt::Formatter, l: &str) -> fmt::Result {
     Ok(())
 }
 
-fn write_span(f: &mut fmt::Formatter, (l_start, l): (usize, &str), span: Range<usize>) -> fmt::Result {
-    for (byte_offset, c) in l.char_indices() {
+fn write_span(f: &mut fmt::Formatter, line: usize, s: &str, run: Run) -> fmt::Result {
+    for (offset, c) in s.char_indices() {
         let cols = match canonicalize(c) {
             None => 0,
             Some(Err(s)) => s.chars().count(),
             Some(Ok(_)) => 1,
         };
 
-        let c = if span.contains(&(l_start + byte_offset)) {
+        let c = if (run.start..run.end).contains(&Point { line, offset }) {
             '^'
         } else {
             ' '
