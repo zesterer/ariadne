@@ -4,16 +4,23 @@ extern crate alloc;
 
 mod display;
 mod file;
+mod render;
 mod span;
 
 pub use crate::{
-    file::{files, File, Files},
+    file::{files, File, FileId, Files},
+    render::Plaintext,
     span::{ByteSpan, CharSpan, Offset, Span},
 };
 
-use crate::file::{Point, Run};
+use crate::{
+    display::Display,
+    file::{Point, Run},
+    render::{CharacterSet, Target},
+};
 use alloc::{
     borrow::Cow,
+    collections::BTreeSet,
     string::{String, ToString},
     vec::Vec,
 };
@@ -65,11 +72,22 @@ impl<K> Diagnostic<K> {
     }
 
     #[cfg(feature = "std")]
-    pub fn eprint<'a, F>(&'a self, files: F)
+    pub fn eprint<'a, F>(&'a self, files: F) -> std::io::Result<()>
     where
+        K: FileId,
         F: Files<'a, K>,
     {
-        eprint!("{}", self.display(files));
+        use std::io::Write as _;
+        std::write!(
+            std::io::stderr(),
+            "{}",
+            Display {
+                d: self,
+                files,
+                chars: CharacterSet::unicode(),
+            }
+        )
+        //Plaintext::new(std::io::stderr()).render(self, files)
     }
 }
 

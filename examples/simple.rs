@@ -10,15 +10,21 @@ match x {
 fn main() {
     Diagnostic::error()
         .with_message("Type mismatch between `bool` and `&str`")
+        // First arm
         .with_label(Label::at(ByteSpan::from(20..25)))
+        // Second arm
         .with_label(Label::at(ByteSpan::from(36..42)))
-        .eprint(CODE);
+        // `match` expr
+        .with_label(Label::at(CharSpan::from(1..46)))
+        // `match` arms
+        .with_label(Label::at(CharSpan::from(11..44)))
+        .eprint(CODE)
+        .unwrap();
 
-    /*
     Diagnostic::error()
         .with_message("Type mismatch between `bool` and `&str`")
         .with_label(Label::at(ByteSpan::new(20..25, "a")))
         .with_label(Label::at(ByteSpan::new(36..42, "b")))
-        .eprint(files([("a", "a.rs", CODE), ("b", "b.rs", CODE)]));
-    */
+        .eprint(files([("a", "a.rs", CODE), ("b", "b.rs", CODE)]))
+        .unwrap();
 }

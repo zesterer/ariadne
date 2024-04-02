@@ -187,7 +187,7 @@ impl<'a> File<'a> {
         Self { lines, content }
     }
 
-    fn line(&self, idx: usize) -> Option<&str> {
+    pub fn line(&self, idx: usize) -> Option<&str> {
         self.lines
             .get(idx)
             .map(|(bytes, _)| &self.content[bytes.clone()])
@@ -209,10 +209,10 @@ impl<'a> File<'a> {
         self.line(idx).map(|s| (idx, s))
     }
 
-    fn offset_to_point(&self, offset: Offset) -> Point {
+    fn offset_to_point(&self, offset: Offset, is_start: bool) -> Point {
         match offset {
             Offset::Byte(byte_offset) => self
-                .line_of_byte(byte_offset)
+                .line_of_byte(byte_offset + is_start as usize)
                 .map(|(line, s)| Point {
                     line,
                     offset: {
@@ -221,9 +221,9 @@ impl<'a> File<'a> {
                         offset
                     },
                 })
-                .unwrap_or_else(|| panic!("byte offset {byte_offset} is greater than the length of the file")),
+                .unwrap_or_else(|| panic!("byte offset {byte_offset} is greater than the length of the file, {}", self.content.len())),
             Offset::Char(char_offset) => self
-                .line_of_char(char_offset)
+                .line_of_char(char_offset + is_start as usize)
                 .and_then(|(line, s)| Some(Point {
                     line,
                     offset: s
@@ -233,14 +233,14 @@ impl<'a> File<'a> {
                         .skip(char_offset - self.lines[line].1.start)
                         .next()?.0,
                 }))
-                .unwrap_or_else(|| panic!("char offset {char_offset} is greater than the number of characters in the file")),
+                .unwrap_or_else(|| panic!("char offset {char_offset} is greater than the number of characters in the file, {}", self.lines.last().unwrap().1.end)),
         }
     }
 
     pub(crate) fn offsets_to_run(&self, offsets: &Range<Offset>) -> Run {
         let run = Run {
-            start: self.offset_to_point(offsets.start),
-            end: self.offset_to_point(offsets.end),
+            start: self.offset_to_point(offsets.start, true),
+            end: self.offset_to_point(offsets.end, false),
         };
         assert!(
             run.end >= run.start,
@@ -252,12 +252,9 @@ impl<'a> File<'a> {
     }
 
     pub(crate) fn lines_of(&self, run: Run) -> impl ExactSizeIterator<Item = (usize, &str)> {
-        let range = if run.end.offset > 0 {
-            run.start.line..run.end.line + 1
-        } else {
-            // Ranges are exclusive, so don't count a line if our end range starts on it
-            run.start.line..run.end.line
-        };
-        range.map(|i| (i, self.line(i).unwrap()))
+        (run.start.line..(run.end.line + 1)).map(|i| (i, self.line(i).unwrap()))
     }
 }
+
+pub trait FileId: Ord + Eq + core::hash::Hash {}
+impl<T: Ord + Eq + core::hash::Hash> FileId for T {}
