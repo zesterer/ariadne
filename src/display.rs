@@ -1,22 +1,19 @@
 use super::*;
 use core::fmt;
 
-pub(crate) struct Display<'a, F, K = ()>
-where
-    F: Files<'a, K>,
-{
+pub(crate) struct Display<'a, F, K = ()> {
     pub(crate) d: &'a Diagnostic<K>,
     pub(crate) files: F,
-    pub(crate) chars: CharacterSet,
+    pub(crate) cfg: &'a render::TextConfig,
 }
 
-impl<'a, F, K> fmt::Display for Display<'a, F, K>
+impl<'a, 'b, F, K> fmt::Display for Display<'b, F, K>
 where
     K: FileId,
     F: Files<'a, K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { d, files, chars } = self;
+        let Self { d, files, cfg } = self;
         let mut file_cache = files.init_cache();
 
         // Header
@@ -38,7 +35,7 @@ where
 
         for file_id in files_to_render {
             let fname = match files.fetch_filename(&mut file_cache, file_id) {
-                Ok(fname) => fname.map(ToOwned::to_owned),
+                Ok(fname) => fname.map(str::to_string),
                 Err(_) => {
                     writeln!(f, "<cannot fetch filename>")?;
                     continue;
@@ -82,31 +79,33 @@ where
                 None => writeln!(
                     f,
                     "{}{}",
-                    draw_margin(None, chars.margin_h),
-                    chars.margin_top_right
+                    draw_margin(None, cfg.chars.margin_h),
+                    cfg.chars.margin_top_right
                 )?,
                 Some(fname) => writeln!(
                     f,
                     "{}{} in {fname}:",
                     draw_margin(None, ' '),
-                    chars.margin_top_left
+                    cfg.chars.margin_top_left
                 )?,
             }
 
             for line in &layout.lines {
                 let s = file.line(line.idx).expect("tried to render invalid line");
 
-                let line_no_width = line.idx / 10 + 1;
-
                 // Source code
                 write!(
                     f,
                     "{}{}",
                     draw_margin(Some(line.idx + 1), ' '),
-                    chars.margin_bar
+                    cfg.chars.margin_bar
                 )?;
-                for _ in 0..layout.max_multiline_nesting {
-                    write!(f, ">")?;
+                for i in 0..layout.max_multiline_nesting {
+                    if line.multiline.iter().any(|ml| ml.line_idx == i) {
+                        write!(f, "|")?;
+                    } else {
+                        write!(f, " ")?;
+                    }
                 }
                 write!(f, " ")?;
                 write_line(f, s)?;
@@ -114,9 +113,13 @@ where
 
                 // Underline
                 if !line.inline.is_empty() {
-                    write!(f, "{}{}", draw_margin(None, ' '), chars.margin_bar_skip)?;
-                    for _ in 0..layout.max_multiline_nesting {
-                        write!(f, ">")?;
+                    write!(f, "{}{}", draw_margin(None, ' '), cfg.chars.margin_bar_skip)?;
+                    for i in 0..layout.max_multiline_nesting {
+                        if line.multiline.iter().any(|ml| ml.line_idx == i) {
+                            write!(f, "|")?;
+                        } else {
+                            write!(f, " ")?;
+                        }
                     }
                     write!(f, " ")?;
                     write_underlines(f, s, |offset| {
@@ -135,8 +138,8 @@ where
             writeln!(
                 f,
                 "{}{}",
-                draw_margin(None, chars.margin_h),
-                chars.margin_bottom_right
+                draw_margin(None, cfg.chars.margin_h),
+                cfg.chars.margin_bottom_right
             )?;
         }
 
@@ -182,68 +185,6 @@ fn write_underlines(
         }
     }
     Ok(())
-}
-
-struct LineLayout<'a, K> {
-    idx: usize,
-    inline: Vec<(Run, &'a Label<K>)>,
-    multiline: Vec<(Run, &'a Label<K>)>,
-}
-
-struct FileLayout<'a, K> {
-    lines: Vec<LineLayout<'a, K>>,
-    max_multiline_nesting: usize,
-}
-
-impl<'a, K> FileLayout<'a, K> {
-    fn new(labels: impl IntoIterator<Item = (Run, &'a Label<K>)>) -> Self {
-        let mut inline = Vec::new();
-        let mut multiline = Vec::new();
-
-        for (run, label) in labels {
-            if run.start.line == run.end.line {
-                inline.push((run, label));
-            } else {
-                multiline.push((run, label));
-            }
-        }
-
-        // Find the set of lines that have an inline or the ends of a multiline span on them
-        // TODO: Integrate some notion of padding/context space so that additional lines can be shown
-        let mut lines = inline
-            .iter()
-            .map(|(r, _)| r.start.line)
-            .chain(
-                multiline
-                    .iter()
-                    .flat_map(|(r, _)| [r.start.line, r.end.line]),
-            )
-            .map(|idx| LineLayout {
-                idx,
-                inline: inline
-                    .iter()
-                    .filter(|(r, _)| r.start.line == idx)
-                    .copied()
-                    .collect(),
-                multiline: multiline
-                    .iter()
-                    .filter(|(r, _)| (r.start.line..=r.end.line).contains(&idx))
-                    .copied()
-                    .collect(),
-            })
-            .collect::<Vec<_>>();
-        // Ensure that every line appears at most once, and in-order
-        lines.sort_unstable_by_key(|l| l.idx);
-        lines.dedup_by_key(|l| l.idx);
-
-        // Find maximum number of multiline spans that intersect with any one line
-        let max_multiline_nesting = lines.iter().map(|l| l.multiline.len()).max().unwrap_or(0);
-
-        Self {
-            lines,
-            max_multiline_nesting,
-        }
-    }
 }
 
 struct Draw<F>(F);

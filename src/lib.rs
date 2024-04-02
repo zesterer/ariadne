@@ -1,26 +1,31 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(private_interfaces, private_bounds)]
 
 extern crate alloc;
 
 mod display;
 mod file;
+mod layout;
 mod render;
 mod span;
 
+#[cfg(feature = "std")]
+pub use crate::render::IoWriter;
 pub use crate::{
     file::{files, File, FileId, Files},
-    render::Plaintext,
+    render::FmtWriter,
     span::{ByteSpan, CharSpan, Offset, Span},
 };
 
 use crate::{
     display::Display,
     file::{Point, Run},
-    render::{CharacterSet, Target},
+    layout::{FileLayout, LineLayout},
+    render::Target,
 };
 use alloc::{
     borrow::Cow,
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     string::{String, ToString},
     vec::Vec,
 };
@@ -71,23 +76,22 @@ impl<K> Diagnostic<K> {
         self
     }
 
+    pub fn render_to<'a, F, T>(&self, files: F, target: &mut T) -> T::Output
+    where
+        K: FileId,
+        F: Files<'a, K>,
+        T: Target,
+    {
+        target.render(self, files)
+    }
+
     #[cfg(feature = "std")]
     pub fn eprint<'a, F>(&'a self, files: F) -> std::io::Result<()>
     where
         K: FileId,
         F: Files<'a, K>,
     {
-        use std::io::Write as _;
-        std::write!(
-            std::io::stderr(),
-            "{}",
-            Display {
-                d: self,
-                files,
-                chars: CharacterSet::unicode(),
-            }
-        )
-        //Plaintext::new(std::io::stderr()).render(self, files)
+        render::IoWriter::new(std::io::stderr()).render(self, files)
     }
 }
 

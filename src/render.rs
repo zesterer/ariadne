@@ -4,46 +4,106 @@ use core::fmt;
 pub(crate) trait Target {
     type Output;
 
-    fn render<K, F>(&mut self, d: Diagnostic<K>, files: F) -> Self::Output
+    fn render<'a, K, F>(&mut self, d: &Diagnostic<K>, files: F) -> Self::Output
     where
         K: FileId,
-        F: for<'a> Files<'a, K>;
+        F: Files<'a, K>;
 }
 
-pub struct Plaintext<W> {
+#[cfg(feature = "std")]
+pub struct IoWriter<W> {
     writer: W,
-    chars: CharacterSet,
+    cfg: TextConfig,
 }
 
-impl<W> Plaintext<W> {
+#[cfg(feature = "std")]
+impl<W> IoWriter<W> {
     pub fn new(writer: W) -> Self {
         Self {
             writer,
-            chars: CharacterSet::ascii(),
+            cfg: TextConfig::default(),
         }
+    }
+
+    pub fn into_inner(self) -> W {
+        self.writer
     }
 }
 
-impl<W> Target for Plaintext<W>
+#[cfg(feature = "std")]
+impl<W> Target for IoWriter<W>
 where
-    W: fmt::Write,
+    W: std::io::Write,
 {
-    type Output = fmt::Result;
+    type Output = std::io::Result<()>;
 
-    fn render<K, F>(&mut self, d: Diagnostic<K>, files: F) -> Self::Output
+    fn render<'a, K, F>(&mut self, d: &Diagnostic<K>, files: F) -> Self::Output
     where
         K: FileId,
-        F: for<'a> Files<'a, K>,
+        F: Files<'a, K>,
     {
         write!(
             self.writer,
             "{}",
             Display {
-                d: &d,
+                d,
                 files,
-                chars: CharacterSet::ascii(),
+                cfg: &self.cfg
             }
         )
+    }
+}
+
+pub struct FmtWriter<W> {
+    writer: W,
+    cfg: TextConfig,
+}
+
+impl<W> FmtWriter<W> {
+    pub fn new(writer: W) -> Self {
+        Self {
+            writer,
+            cfg: TextConfig::default(),
+        }
+    }
+
+    pub fn into_inner(self) -> W {
+        self.writer
+    }
+}
+
+impl<W> Target for FmtWriter<W>
+where
+    W: fmt::Write,
+{
+    type Output = fmt::Result;
+
+    fn render<'a, K, F>(&mut self, d: &Diagnostic<K>, files: F) -> Self::Output
+    where
+        K: FileId,
+        F: Files<'a, K>,
+    {
+        write!(
+            self.writer,
+            "{}",
+            Display {
+                d,
+                files,
+                cfg: &self.cfg
+            }
+        )
+    }
+}
+
+pub struct TextConfig {
+    pub(crate) chars: CharacterSet,
+}
+
+impl Default for TextConfig {
+    fn default() -> Self {
+        Self {
+            chars: CharacterSet::unicode(),
+        }
     }
 }
 
