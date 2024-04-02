@@ -41,7 +41,17 @@ where
             writeln!(f, "")?;
         }
 
-        for label in &d.labels {
+        let sorted_spans = SortedSpans::new(d.labels.iter().filter_map(|l| {
+            match files.fetch_file(&mut file_cache, &l.file_id) {
+                Ok(file) => Some((file.offsets_to_run(&l.offsets), l)),
+                Err(_) => {
+                    writeln!(f, "<cannot fetch file>").ok()?;
+                    None
+                }
+            }
+        }));
+
+        for (run, label) in &sorted_spans.inline {
             match files.fetch_filename(&mut file_cache, &label.file_id) {
                 Ok(None) => {}
                 Ok(Some(fname)) => writeln!(f, "in {}:", fname)?,
@@ -49,20 +59,18 @@ where
             }
 
             match files.fetch_file(&mut file_cache, &label.file_id) {
-                Ok(file) => {
-                    let run = file.offsets_to_run(&label.offsets);
-                    file.lines_of(run)
-                        .map(|(line, s)| {
-                            write!(f, "{:>3} | ", line + 1)?;
-                            write_line(f, s)?;
-                            writeln!(f, "")?;
-                            write!(f, "    | ")?;
-                            write_span(f, line, s, run)?;
-                            writeln!(f, "")?;
-                            Ok(())
-                        })
-                        .collect::<Result<_, _>>()?;
-                }
+                Ok(file) => file
+                    .lines_of(*run)
+                    .map(|(line, s)| {
+                        write!(f, "{:>3} | ", line + 1)?;
+                        write_line(f, s)?;
+                        writeln!(f, "")?;
+                        write!(f, "    | ")?;
+                        write_span(f, line, s, *run)?;
+                        writeln!(f, "")?;
+                        Ok(())
+                    })
+                    .collect::<Result<_, _>>()?,
                 Err(_) => writeln!(f, "<cannot fetch file>")?,
             }
         }
@@ -109,4 +117,26 @@ fn write_span(f: &mut fmt::Formatter, line: usize, s: &str, run: Run) -> fmt::Re
         }
     }
     Ok(())
+}
+
+struct SortedSpans<'a, K> {
+    inline: Vec<(Run, &'a Label<K>)>,
+    multiline: Vec<(Run, &'a Label<K>)>,
+}
+
+impl<'a, K> SortedSpans<'a, K> {
+    fn new(labels: impl IntoIterator<Item = (Run, &'a Label<K>)>) -> Self {
+        let mut inline = Vec::new();
+        let mut multiline = Vec::new();
+
+        for (run, label) in labels {
+            if run.start.line == run.end.line {
+                inline.push((run, label));
+            } else {
+                multiline.push((run, label));
+            }
+        }
+
+        Self { inline, multiline }
+    }
 }
