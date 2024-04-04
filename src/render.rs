@@ -115,6 +115,11 @@ pub struct CharacterSet {
     pub margin_top_left: char,
     pub margin_top_right: char,
     pub margin_bottom_right: char,
+
+    pub label_v: char,
+    pub label_h: char,
+    pub label_top_left: char,
+    pub label_bottom_left: char,
 }
 
 impl CharacterSet {
@@ -126,6 +131,10 @@ impl CharacterSet {
             margin_top_left: ',',
             margin_top_right: '.',
             margin_bottom_right: '\'',
+            label_v: '|',
+            label_h: '-',
+            label_top_left: ',',
+            label_bottom_left: '\'',
         }
     }
 
@@ -137,6 +146,10 @@ impl CharacterSet {
             margin_top_left: '╭',
             margin_top_right: '╮',
             margin_bottom_right: '╯',
+            label_v: '│',
+            label_h: '─',
+            label_top_left: '╭',
+            label_bottom_left: '╰',
         }
     }
 }

@@ -4,7 +4,7 @@ pub(crate) struct MultilineLayout<'a, K> {
     // An ordered identity of the multiline span with respect to all multiline spans in the file
     pub(crate) file_idx: usize,
     // An ordered identity of the multiline span, guaranteed to not conflict with multiline spans covering the same line
-    pub(crate) line_idx: usize,
+    pub(crate) line_idx: Option<usize>,
     pub(crate) run: Run,
     pub(crate) label: &'a Label<K>,
 }
@@ -12,11 +12,13 @@ pub(crate) struct MultilineLayout<'a, K> {
 pub(crate) struct LineLayout<'a, K> {
     pub(crate) idx: usize,
     pub(crate) inline: Vec<(Run, &'a Label<K>)>,
-    pub(crate) multiline: Vec<MultilineLayout<'a, K>>,
+    // Index to be looked up in `FileLayout.multilines`
+    pub(crate) multiline: Vec<usize>,
 }
 
 pub(crate) struct FileLayout<'a, K> {
     pub(crate) lines: Vec<LineLayout<'a, K>>,
+    pub(crate) multilines: Vec<MultilineLayout<'a, K>>,
     pub(crate) max_multiline_nesting: usize,
 }
 
@@ -39,6 +41,17 @@ impl<'a, K> FileLayout<'a, K> {
 
         let mut slots = BTreeMap::<_, usize>::new();
 
+        let mut multilines = multiline
+            .iter()
+            .enumerate()
+            .map(|(file_idx, (r, l))| MultilineLayout {
+                file_idx,
+                line_idx: None,
+                run: *r,
+                label: *l,
+            })
+            .collect::<Vec<_>>();
+
         // Find the set of lines that have an inline or the ends of a multiline span on them
         // TODO: Integrate some notion of padding/context space so that additional lines can be shown
         let mut lines = inline
@@ -56,40 +69,36 @@ impl<'a, K> FileLayout<'a, K> {
                     .filter(|(r, _)| r.start.line == idx)
                     .copied()
                     .collect(),
-                multiline: multiline
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, (r, _))| (r.start.line..=r.end.line).contains(&idx))
-                    .map(|(file_idx, (r, l))| {
+                multiline: multilines
+                    .iter_mut()
+                    .filter(|ml| (ml.run.start.line..=ml.run.end.line).contains(&idx))
+                    .map(|ml| {
                         // Find an idx that is consistent across the span, but that reuses the indices of non-intersecting multiline spans
                         // TODO: Don't do this per-line, choose this value once
-                        let line_idx = if let Some(line_idx) = slots.get(&file_idx) {
-                            *line_idx
-                        } else {
-                            // Find a free idx or override a stale idx
-                            let mut i = 0;
-                            loop {
-                                if let Some(ml) = slots.get(&i) {
-                                    if multiline[*ml].0.end.line < idx {
-                                        slots.remove(&i);
+                        if ml.line_idx.is_none() {
+                            ml.line_idx = Some(if let Some(line_idx) = slots.get(&ml.file_idx) {
+                                *line_idx
+                            } else {
+                                // Find a free idx or override a stale idx
+                                let mut i = 0;
+                                loop {
+                                    if let Some(ml) = slots.get(&i) {
+                                        if multiline[*ml].0.end.line < idx {
+                                            slots.remove(&i);
+                                        }
                                     }
+
+                                    if !slots.contains_key(&i) {
+                                        slots.insert(i, ml.file_idx);
+                                        break i;
+                                    }
+
+                                    i += 1;
                                 }
-
-                                if !slots.contains_key(&i) {
-                                    slots.insert(i, file_idx);
-                                    break i;
-                                }
-
-                                i += 1;
-                            }
-                        };
-
-                        MultilineLayout {
-                            file_idx,
-                            line_idx,
-                            run: *r,
-                            label: *l,
+                            });
                         }
+
+                        ml.file_idx
                     })
                     .collect(),
             })
@@ -103,6 +112,7 @@ impl<'a, K> FileLayout<'a, K> {
 
         Self {
             lines,
+            multilines,
             max_multiline_nesting,
         }
     }

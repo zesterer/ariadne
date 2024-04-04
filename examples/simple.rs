@@ -19,6 +19,7 @@ fn main() {
         // `match` arms
         .with_label(Label::at(CharSpan::from(11..44)))
         .with_label(Label::at(CharSpan::from(1..25)))
+        .with_label(Label::at(CharSpan::from(30..45)))
         .eprint(CODE)
         .unwrap();
 

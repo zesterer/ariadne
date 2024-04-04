@@ -93,35 +93,55 @@ where
             for line in &layout.lines {
                 let s = file.line(line.idx).expect("tried to render invalid line");
 
+                // Draw the edge of multiline labels
+                let draw_multiline_edge = |is_src| {
+                    let multilines = &layout.multilines;
+                    draw(move |f| {
+                        for col in 0..layout.max_multiline_nesting {
+                            if let Some(ml) = line
+                                .multiline
+                                .iter()
+                                .map(|ml| &multilines[*ml])
+                                .find(|ml| ml.line_idx == Some(col))
+                            {
+                                let c = if is_src && ml.run.start.line == line.idx {
+                                    cfg.chars.label_top_left
+                                } else if is_src && ml.run.end.line == line.idx {
+                                    cfg.chars.label_bottom_left
+                                } else if is_src || line.idx < ml.run.end.line {
+                                    cfg.chars.label_v
+                                } else {
+                                    ' '
+                                };
+                                write!(f, "{c}")?;
+                            } else {
+                                write!(f, " ")?;
+                            }
+                        }
+                        Ok(())
+                    })
+                };
+
                 // Source code
                 write!(
                     f,
-                    "{}{}",
+                    "{}{}{} ",
                     draw_margin(Some(line.idx + 1), ' '),
-                    cfg.chars.margin_bar
+                    cfg.chars.margin_bar,
+                    draw_multiline_edge(true),
                 )?;
-                for i in 0..layout.max_multiline_nesting {
-                    if line.multiline.iter().any(|ml| ml.line_idx == i) {
-                        write!(f, "|")?;
-                    } else {
-                        write!(f, " ")?;
-                    }
-                }
-                write!(f, " ")?;
                 write_line(f, s)?;
                 writeln!(f, "")?;
 
                 // Underline
                 if !line.inline.is_empty() {
-                    write!(f, "{}{}", draw_margin(None, ' '), cfg.chars.margin_bar_skip)?;
-                    for i in 0..layout.max_multiline_nesting {
-                        if line.multiline.iter().any(|ml| ml.line_idx == i) {
-                            write!(f, "|")?;
-                        } else {
-                            write!(f, " ")?;
-                        }
-                    }
-                    write!(f, " ")?;
+                    write!(
+                        f,
+                        "{}{}{} ",
+                        draw_margin(None, ' '),
+                        cfg.chars.margin_bar_skip,
+                        draw_multiline_edge(false)
+                    )?;
                     write_underlines(f, s, |offset| {
                         line.inline.iter().any(|(r, _)| {
                             (r.start..r.end).contains(&Point {
