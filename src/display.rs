@@ -142,13 +142,24 @@ where
                         cfg.chars.margin_bar_skip,
                         draw_multiline_edge(false)
                     )?;
-                    write_underlines(f, s, |offset| {
-                        line.inline.iter().any(|(r, _)| {
-                            (r.start..r.end).contains(&Point {
-                                line: line.idx,
-                                offset,
+                    write_underlines(f, s, |offsets| {
+                        line.inline
+                            .iter()
+                            .filter_map(|il| {
+                                let il = &layout.inlines[*il];
+                                // Number denotes priority
+                                if offsets.contains(&il.arrow_offset) {
+                                    Some((1, cfg.chars.arrow_underconnect))
+                                } else if il.run.start.offset <= offsets.start
+                                    && il.run.end.offset >= offsets.end
+                                {
+                                    Some((0, cfg.chars.arrow_underline))
+                                } else {
+                                    None
+                                }
                             })
-                        })
+                            .max()
+                            .map(|(_, c)| c)
                     })?;
                     writeln!(f, "")?;
                 }
@@ -189,7 +200,8 @@ fn write_line(f: &mut fmt::Formatter, s: &str) -> fmt::Result {
 fn write_underlines(
     f: &mut fmt::Formatter,
     s: &str,
-    should_underline: impl Fn(usize) -> bool,
+    // Whether the given offset range contains an underline (note: range to account for utf-8)
+    get_underline: impl Fn(Range<usize>) -> Option<char>,
 ) -> fmt::Result {
     for (offset, c) in s.char_indices() {
         let cols = match canonicalize(c) {
@@ -198,7 +210,7 @@ fn write_underlines(
             Some(Ok(_)) => 1,
         };
 
-        let c = if should_underline(offset) { '^' } else { ' ' };
+        let c = get_underline(offset..offset + c.len_utf8()).unwrap_or(' ');
 
         for _ in 0..cols {
             write!(f, "{c}")?;

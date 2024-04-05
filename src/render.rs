@@ -120,6 +120,8 @@ pub struct CharacterSet {
     pub label_h: char,
     pub label_top_left: char,
     pub label_bottom_left: char,
+    pub arrow_underline: char,
+    pub arrow_underconnect: char,
 }
 
 impl CharacterSet {
@@ -135,6 +137,8 @@ impl CharacterSet {
             label_h: '-',
             label_top_left: ',',
             label_bottom_left: '\'',
+            arrow_underline: '-',
+            arrow_underconnect: '-',
         }
     }
 
@@ -150,6 +154,8 @@ impl CharacterSet {
             label_h: '─',
             label_top_left: '╭',
             label_bottom_left: '╰',
+            arrow_underline: '─',
+            arrow_underconnect: '┬',
         }
     }
 }

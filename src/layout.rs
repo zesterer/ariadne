@@ -1,5 +1,12 @@
 use super::*;
 
+pub(crate) struct InlineLayout<'a, K> {
+    // What offset in the line should the label be attached to its text at?
+    pub(crate) arrow_offset: usize,
+    pub(crate) run: Run,
+    pub(crate) label: &'a Label<K>,
+}
+
 pub(crate) struct MultilineLayout<'a, K> {
     // An ordered identity of the multiline span with respect to all multiline spans in the file
     pub(crate) file_idx: usize,
@@ -9,15 +16,16 @@ pub(crate) struct MultilineLayout<'a, K> {
     pub(crate) label: &'a Label<K>,
 }
 
-pub(crate) struct LineLayout<'a, K> {
+pub(crate) struct LineLayout {
     pub(crate) idx: usize,
-    pub(crate) inline: Vec<(Run, &'a Label<K>)>,
+    pub(crate) inline: Vec<usize>,
     // Index to be looked up in `FileLayout.multilines`
     pub(crate) multiline: Vec<usize>,
 }
 
 pub(crate) struct FileLayout<'a, K> {
-    pub(crate) lines: Vec<LineLayout<'a, K>>,
+    pub(crate) lines: Vec<LineLayout>,
+    pub(crate) inlines: Vec<InlineLayout<'a, K>>,
     pub(crate) multilines: Vec<MultilineLayout<'a, K>>,
     pub(crate) max_multiline_nesting: usize,
 }
@@ -38,6 +46,15 @@ impl<'a, K> FileLayout<'a, K> {
         // Multiline spans have a canonical ordering according to number of lines they cover
         // TODO: Is there an ordering that makes more sense and results in less line-crossing?
         multiline.sort_by_key(|(r, _)| !0 - (r.end.line - r.start.line));
+
+        let inlines = inline
+            .iter()
+            .map(|(r, l)| InlineLayout {
+                arrow_offset: (r.start.offset + r.end.offset) / 2,
+                run: *r,
+                label: *l,
+            })
+            .collect::<Vec<_>>();
 
         let mut slots = BTreeMap::<_, usize>::new();
 
@@ -64,10 +81,11 @@ impl<'a, K> FileLayout<'a, K> {
             )
             .map(|idx| LineLayout {
                 idx,
-                inline: inline
+                inline: inlines
                     .iter()
-                    .filter(|(r, _)| r.start.line == idx)
-                    .copied()
+                    .enumerate()
+                    .filter(|(_, il)| il.run.start.line == idx)
+                    .map(|(idx, _)| idx)
                     .collect(),
                 multiline: multilines
                     .iter_mut()
@@ -112,6 +130,7 @@ impl<'a, K> FileLayout<'a, K> {
 
         Self {
             lines,
+            inlines,
             multilines,
             max_multiline_nesting,
         }

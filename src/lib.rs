@@ -98,11 +98,24 @@ impl<K> Diagnostic<K> {
 pub struct Label<K = ()> {
     file_id: K,
     offsets: Range<Offset>,
+    msg: Option<String>,
 }
 
 impl<K> Label<K> {
     pub fn at<S: Span<FileId = K>>(span: S) -> Self {
         let (file_id, offsets) = span.into_parts();
-        Self { file_id, offsets }
+        Self {
+            file_id,
+            offsets,
+            msg: None,
+        }
+    }
+
+    pub fn with_message<M>(mut self, message: M) -> Self
+    where
+        M: ToString,
+    {
+        self.msg = Some(message.to_string());
+        self
     }
 }
