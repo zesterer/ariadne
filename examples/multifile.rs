@@ -25,6 +25,8 @@ fn main() {
             .with_message(format!("Original definition of {} is here", "five".fg(a)))
             .with_color(a))
         .with_note(format!("{} is a number and can only be added to other numbers", "Nat".fg(a)))
+        .with_note("Multiple notes are possible".to_string())
+        .with_note("Multiline notes\ncan be also used when the note is humongous.")
         .finish()
         .print(sources(vec![
             ("a.tao", include_str!("a.tao")),
