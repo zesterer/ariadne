@@ -53,6 +53,30 @@ impl Characters {
         }
     }
 
+    pub fn unicode_straight() -> Self {
+        Self {
+            hbar: '─',
+            vbar: '│',
+            xbar: '┼',
+            vbar_break: '┆',
+            vbar_gap: '┆',
+            uarrow: '▲',
+            rarrow: '▶',
+            ltop: '┌',
+            mtop: '┬',
+            rtop: '┐',
+            lbot: '└',
+            mbot: '┴',
+            rbot: '┘',
+            lbox: '[',
+            rbox: ']',
+            lcross: '├',
+            rcross: '┤',
+            underbar: '┬',
+            underline: '─',
+        }
+    }
+
     pub fn ascii() -> Self {
         Self {
             hbar: '-',

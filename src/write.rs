@@ -149,6 +149,7 @@ impl<S: Span> Report<'_, S> {
     ) -> io::Result<()> {
         let draw = match self.config.char_set {
             CharSet::Unicode => draw::Characters::unicode(),
+            CharSet::UnicodeStraight => draw::Characters::unicode_straight(),
             CharSet::Ascii => draw::Characters::ascii(),
         };
 
@@ -1184,4 +1185,51 @@ mod tests {
         ---'
         "###)
     }
+
+    #[test]
+    fn unicode_style() {
+        let source = "apple == orange;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(Config::default().with_char_set(CharSet::Unicode).with_color(false))
+            .with_message("can't compare apples with oranges")
+            .with_label(Label::new(0..5).with_message("This is an apple"))
+            .with_label(Label::new(9..15).with_message("This is an orange"))
+            .finish()
+            .write_to_string(Source::from(source));
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an apple
+           │             │    
+           │             ╰──── This is an orange
+        ───╯
+        "###)
+    }
+
+        #[test]
+    fn unicode_stright_style() {
+        let source = "apple == orange;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(Config::default().with_char_set(CharSet::UnicodeStraight).with_color(false))
+            .with_message("can't compare apples with oranges")
+            .with_label(Label::new(0..5).with_message("This is an apple"))
+            .with_label(Label::new(9..15).with_message("This is an orange"))
+            .finish()
+            .write_to_string(Source::from(source));
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ┌─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──  
+           │   └────────────── This is an apple
+           │             │    
+           │             └──── This is an orange
+        ───┘
+        "###)
+    }
 }
+
