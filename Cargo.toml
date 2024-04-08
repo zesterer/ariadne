@@ -18,7 +18,7 @@ exclude = [
 auto-color = ["concolor", "concolor/auto"]
 
 [dependencies]
-yansi = "0.5"
+yansi = "1.0"
 unicode-width = "0.1.9"
 concolor = { version = "0.1", optional = true }
 
