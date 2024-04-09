@@ -530,6 +530,7 @@ impl Default for Config {
 
 #[test]
 #[should_panic]
+#[allow(clippy::reversed_empty_ranges)]
 fn backwards_label_should_panic() {
     Label::new(1..0);
 }

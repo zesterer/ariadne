@@ -723,7 +723,20 @@ impl<S: Span> Report<'_, S> {
                             let underline = get_underline(col).filter(|_| row == 0);
                             let [c, tail] = if let Some(vbar_ll) = vbar {
                                 let [c, tail] = if underline.is_some() {
-                                    [draw.underbar, draw.underline]
+                                    // TODO: Is this good?
+                                    // The `true` is used here because it's temporarily disabling a
+                                    // feature that might be reenabled later.
+                                    #[allow(clippy::overly_complex_bool_expr)]
+                                    if ExactSizeIterator::len(&vbar_ll.label.char_span) <= 1 || true
+                                    {
+                                        [draw.underbar, draw.underline]
+                                    } else if line.offset() + col == vbar_ll.label.char_span.start {
+                                        [draw.ltop, draw.underbar]
+                                    } else if line.offset() + col == vbar_ll.label.last_offset() {
+                                        [draw.rtop, draw.underbar]
+                                    } else {
+                                        [draw.underbar, draw.underline]
+                                    }
                                 } else if vbar_ll.multi && row == 0 && self.config.multiline_arrows
                                 {
                                     [draw.uarrow, ' ']
