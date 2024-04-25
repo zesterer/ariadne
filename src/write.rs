@@ -751,11 +751,9 @@ impl<S: Span> Report<'_, S> {
                 // Arrows
                 for row in 0..line_labels.len() {
                     let line_label = &line_labels[row];
-                    //No message to draw thus no arrow to draw
-                    if line_label.label.display_info.msg.is_none() {
-                        continue;
-                    }
-                    if !self.config.compact {
+                    if (line_label.label.display_info.msg.is_some() || row == 0)
+                        && !self.config.compact
+                    {
                         // Margin alternate
                         write_margin(
                             &mut w,
@@ -814,6 +812,11 @@ impl<S: Span> Report<'_, S> {
                             }
                         }
                         writeln!(w)?;
+                    }
+
+                    // No message to draw thus no arrow to draw
+                    if line_label.label.display_info.msg.is_none() {
+                        continue;
                     }
 
                     // Margin
@@ -1048,12 +1051,12 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        // TODO: it would be nice if these spans still showed up (like codespan-reporting does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
+           | ^^^^^    ^^^^^^
         ---'
         "###);
     }
