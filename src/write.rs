@@ -247,8 +247,17 @@ impl<S: Span> Report<'_, S> {
             } else {
                 labels[0].char_span.start
             };
-            let (line_no, col_no) = src
-                .get_offset_line(location)
+            let line_and_col = match self.config.index_type {
+                IndexType::Char => src.get_offset_line(location),
+                IndexType::Byte => src.get_byte_line(location).map(|(line_obj, idx, col)| {
+                    let line_text = src.get_line_text(line_obj).unwrap();
+
+                    let col = line_text[..col.min(line_text.len())].chars().count();
+
+                    (line_obj, idx, col)
+                }),
+            };
+            let (line_no, col_no) = line_and_col
                 .map(|(_, idx, col)| (format!("{}", idx + 1), format!("{}", col + 1)))
                 .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
             let line_ref = format!(":{}:{}", line_no, col_no);
@@ -1010,6 +1019,30 @@ mod tests {
         assert_snapshot!(msg, @r###"
         Error: can't compare äpplës with örängës
            ,-[<unknown>:1:1]
+           |
+         1 | äpplë == örängë;
+           | ^^|^^    ^^^|^^  
+           |   `-------------- This is an äpplë
+           |             |    
+           |             `---- This is an örängë
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn byte_column() {
+        let source = "äpplë == örängë;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 11)
+            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+            .with_message("can't compare äpplës with örängës")
+            .with_label(Label::new(0..7).with_message("This is an äpplë"))
+            .with_label(Label::new(11..20).with_message("This is an örängë"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if these lines didn't cross
+        assert_snapshot!(msg, @r###"
+        Error: can't compare äpplës with örängës
+           ,-[<unknown>:1:10]
            |
          1 | äpplë == örängë;
            | ^^|^^    ^^^|^^  
