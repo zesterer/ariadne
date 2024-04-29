@@ -510,10 +510,9 @@ impl Config {
             _ => (c, c.width().unwrap_or(1)),
         }
     }
-}
 
-impl Default for Config {
-    fn default() -> Self {
+    /// Create a new, default config.
+    pub const fn new() -> Self {
         Self {
             cross_gap: true,
             label_attach: LabelAttach::Middle,
@@ -525,6 +524,13 @@ impl Default for Config {
             char_set: CharSet::Unicode,
             index_type: IndexType::Char,
         }
+    }
+}
+
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
