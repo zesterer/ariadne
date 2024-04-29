@@ -412,63 +412,63 @@ impl Config {
     /// The alternative to this is to insert crossing characters. However, these interact poorly with label colours.
     ///
     /// If unspecified, this defaults to [`false`].
-    pub fn with_cross_gap(mut self, cross_gap: bool) -> Self {
+    pub const fn with_cross_gap(mut self, cross_gap: bool) -> Self {
         self.cross_gap = cross_gap;
         self
     }
     /// Where should inline labels attach to their spans?
     ///
     /// If unspecified, this defaults to [`LabelAttach::Middle`].
-    pub fn with_label_attach(mut self, label_attach: LabelAttach) -> Self {
+    pub const fn with_label_attach(mut self, label_attach: LabelAttach) -> Self {
         self.label_attach = label_attach;
         self
     }
     /// Should the report remove gaps to minimise used space?
     ///
     /// If unspecified, this defaults to [`false`].
-    pub fn with_compact(mut self, compact: bool) -> Self {
+    pub const fn with_compact(mut self, compact: bool) -> Self {
         self.compact = compact;
         self
     }
     /// Should underlines be used for label span where possible?
     ///
     /// If unspecified, this defaults to [`true`].
-    pub fn with_underlines(mut self, underlines: bool) -> Self {
+    pub const fn with_underlines(mut self, underlines: bool) -> Self {
         self.underlines = underlines;
         self
     }
     /// Should arrows be used to point to the bounds of multi-line spans?
     ///
     /// If unspecified, this defaults to [`true`].
-    pub fn with_multiline_arrows(mut self, multiline_arrows: bool) -> Self {
+    pub const fn with_multiline_arrows(mut self, multiline_arrows: bool) -> Self {
         self.multiline_arrows = multiline_arrows;
         self
     }
     /// Should colored output should be enabled?
     ///
     /// If unspecified, this defaults to [`true`].
-    pub fn with_color(mut self, color: bool) -> Self {
+    pub const fn with_color(mut self, color: bool) -> Self {
         self.color = color;
         self
     }
     /// How many characters width should tab characters be?
     ///
     /// If unspecified, this defaults to `4`.
-    pub fn with_tab_width(mut self, tab_width: usize) -> Self {
+    pub const fn with_tab_width(mut self, tab_width: usize) -> Self {
         self.tab_width = tab_width;
         self
     }
     /// What character set should be used to display dynamic elements such as boxes and arrows?
     ///
     /// If unspecified, this defaults to [`CharSet::Unicode`].
-    pub fn with_char_set(mut self, char_set: CharSet) -> Self {
+    pub const fn with_char_set(mut self, char_set: CharSet) -> Self {
         self.char_set = char_set;
         self
     }
     /// Should this report use byte spans instead of char spans?
     ///
     /// If unspecified, this defaults to 'false'
-    pub fn with_index_type(mut self, index_type: IndexType) -> Self {
+    pub const fn with_index_type(mut self, index_type: IndexType) -> Self {
         self.index_type = index_type;
         self
     }
