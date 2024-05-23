@@ -3,7 +3,6 @@ use super::*;
 use std::{
     collections::{hash_map::Entry, HashMap},
     fs,
-    mem::replace,
     path::{Path, PathBuf},
 };
 
@@ -111,49 +110,35 @@ impl<I: AsRef<str>> From<I> for Source<I> {
     fn from(input: I) -> Self {
         let mut char_offset = 0;
         let mut byte_offset = 0;
-        // (Last line, last line ends with CR)
-        let mut last_line: Option<(Line, bool)> = None;
-        let mut lines: Vec<Line> = input
-            .as_ref()
-            .split_inclusive([
-                '\r',       // Carriage return
-                '\n',       // Line feed
-                '\x0B',     // Vertical tab
-                '\x0C',     // Form feed
-                '\u{0085}', // Next line
-                '\u{2028}', // Line separator
-                '\u{2029}', // Paragraph separator
-            ])
-            .flat_map(|line| {
-                // Returns last line and set `last_line` to current `line`
-                // A hack that makes `flat_map` deals with consecutive lines
+        let mut lines = Vec::new();
 
-                if let Some((last, ends_with_cr)) = last_line.as_mut() {
-                    if *ends_with_cr && line == "\n" {
-                        last.char_len += 1;
-                        last.byte_len += 1;
-                        char_offset += 1;
-                        byte_offset += 1;
-                        return last_line.take().map(|(l, _)| l);
-                    }
-                }
+        const SEPARATORS: [char; 7] = [
+            '\r',       // Carriage return
+            '\n',       // Line feed
+            '\x0B',     // Vertical tab
+            '\x0C',     // Form feed
+            '\u{0085}', // Next line
+            '\u{2028}', // Line separator
+            '\u{2029}', // Paragraph separator
+        ];
+        let mut remaining = input.as_ref().split_inclusive(SEPARATORS).peekable();
+        while let Some(line) = remaining.next() {
+            let mut byte_len = line.len();
+            let mut char_len = line.chars().count();
+            // Handle CRLF as a single terminator.
+            if line.ends_with('\r') && remaining.next_if_eq(&"\n").is_some() {
+                byte_len += 1;
+                char_len += 1;
+            }
+            lines.push(Line {
+                offset: char_offset,
+                char_len,
+                byte_offset,
+                byte_len,
+            });
 
-                let char_len = line.chars().count();
-                let ends_with_cr = line.ends_with('\r');
-                let line = Line {
-                    offset: char_offset,
-                    char_len,
-                    byte_offset,
-                    byte_len: line.len(),
-                };
-                char_offset += char_len;
-                byte_offset += line.byte_len;
-                replace(&mut last_line, Some((line, ends_with_cr))).map(|(l, _)| l)
-            })
-            .collect();
-
-        if let Some((l, _)) = last_line {
-            lines.push(l);
+            char_offset += char_len;
+            byte_offset += byte_len;
         }
 
         Self {
