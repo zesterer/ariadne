@@ -1098,6 +1098,102 @@ mod tests {
     }
 
     #[test]
+    fn empty_input() {
+        let source = "";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("unexpected end of file")
+            .with_label(Label::new(0..0).with_message("No more fruit!"))
+            .finish()
+            .write_to_string(Source::from(source));
+
+        assert_snapshot!(msg, @r###"
+        Error: unexpected end of file
+           ,-[<unknown>:1:1]
+           |
+         1 | 
+           | | 
+           | `- No more fruit!
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn empty_input_help() {
+        let source = "";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("unexpected end of file")
+            .with_label(Label::new(0..0).with_message("No more fruit!"))
+            .with_help("have you tried going to the farmer's market?")
+            .finish()
+            .write_to_string(Source::from(source));
+
+        assert_snapshot!(msg, @r###"
+        Error: unexpected end of file
+           ,-[<unknown>:1:1]
+           |
+         1 | 
+           | | 
+           | `- No more fruit!
+           | 
+           | Help: have you tried going to the farmer's market?
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn empty_input_note() {
+        let source = "";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("unexpected end of file")
+            .with_label(Label::new(0..0).with_message("No more fruit!"))
+            .with_note("eat your greens!")
+            .finish()
+            .write_to_string(Source::from(source));
+
+        assert_snapshot!(msg, @r###"
+        Error: unexpected end of file
+           ,-[<unknown>:1:1]
+           |
+         1 | 
+           | | 
+           | `- No more fruit!
+           | 
+           | Note: eat your greens!
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn empty_input_help_note() {
+        let source = "";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("unexpected end of file")
+            .with_label(Label::new(0..0).with_message("No more fruit!"))
+            .with_note("eat your greens!")
+            .with_help("have you tried going to the farmer's market?")
+            .finish()
+            .write_to_string(Source::from(source));
+
+        assert_snapshot!(msg, @r###"
+        Error: unexpected end of file
+           ,-[<unknown>:1:1]
+           |
+         1 | 
+           | | 
+           | `- No more fruit!
+           | 
+           | Help: have you tried going to the farmer's market?
+           | 
+           | Note: eat your greens!
+        ---'
+        "###);
+    }
+
+    #[test]
     fn byte_spans_never_crash() {
         let source = "apple\np\n\nempty\n";
 

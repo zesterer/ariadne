@@ -108,6 +108,22 @@ impl<I: AsRef<str>> From<I> for Source<I> {
     ///
     /// Note that this function can be expensive for long strings. Use an implementor of [`Cache`] where possible.
     fn from(input: I) -> Self {
+        // `input.split_inclusive()` will not iterate at all,
+        // but an empty input still ought to count as a single empty line.
+        if input.as_ref().is_empty() {
+            return Self {
+                text: input,
+                lines: vec![Line {
+                    offset: 0,
+                    char_len: 0,
+                    byte_offset: 0,
+                    byte_len: 0,
+                }],
+                len: 0,
+                byte_len: 0,
+            };
+        }
+
         let mut char_offset = 0;
         let mut byte_offset = 0;
         let mut lines = Vec::new();
@@ -383,7 +399,7 @@ mod tests {
 
     #[test]
     fn source_from_empty() {
-        test_with_lines(vec![]); // Empty string
+        test_with_lines(vec![""]); // Empty string
     }
 
     #[test]
