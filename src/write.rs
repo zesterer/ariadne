@@ -4,7 +4,7 @@ use std::ops::Range;
 use crate::{IndexType, LabelDisplay};
 
 use super::draw::{self, StreamAwareFmt, StreamType};
-use super::{Cache, CharSet, LabelAttach, Report, ReportKind, Rept, Show, Span, Write};
+use super::{Cache, CharSet, LabelAttach, Report, Rept, Show, Span, Write};
 
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
 //
@@ -171,12 +171,7 @@ impl<S: Span> Report<'_, S> {
 
         let code = self.code.as_ref().map(|c| format!("[{}] ", c));
         let id = format!("{}{}:", Show(code), self.kind);
-        let kind_color = match self.kind {
-            ReportKind::Error => self.config.error_color(),
-            ReportKind::Warning => self.config.warning_color(),
-            ReportKind::Advice => self.config.advice_color(),
-            ReportKind::Custom(_, color) => Some(color),
-        };
+        let kind_color = self.kind.color(&self.config);
         writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
 
         let groups = self.get_source_groups(&mut cache);
