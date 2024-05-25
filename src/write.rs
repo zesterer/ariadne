@@ -179,16 +179,12 @@ impl<S: Span> Report<'_, S> {
         // Line number maximum width
         let line_no_width = groups
             .iter()
-            .filter_map(
-                |SourceGroup {
-                     char_span, src_id, ..
-                 }| {
-                    fetch_source(&mut cache, src_id).map(|(src, _)| {
-                        let line_range = src.get_line_range(char_span);
-                        nb_digits(line_range.end)
-                    })
-                },
-            )
+            .filter_map(|group| {
+                fetch_source(&mut cache, group.src_id).map(|(src, _)| {
+                    let line_range = src.get_line_range(&group.char_span);
+                    nb_digits(line_range.end)
+                })
+            })
             .max()
             .unwrap_or(0);
 
