@@ -349,7 +349,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     w,
                     " {}{}",
                     line_no_margin,
-                    Show(Some(' ').filter(|_| !self.config.compact)),
+                    Show((!self.config.compact).then_some(' ')),
                 )?;
 
                 // Multi-line margins
@@ -384,7 +384,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 if let Some(margin) = margin.filter(|_| is_line) {
                                     margin_ptr = Some((margin, is_start));
                                 } else if !is_start && (!is_end || is_line) {
-                                    vbar = vbar.or(Some(*label).filter(|_| !is_parent));
+                                    vbar = vbar.or((!is_parent).then_some(*label));
                                 } else if let Some((report_row, is_arrow)) = report_row {
                                     let label_row = line_labels
                                         .iter()
@@ -393,7 +393,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                         .map_or(0, |(r, _)| r);
                                     if report_row == label_row {
                                         if let Some(margin) = margin {
-                                            vbar = Some(margin.label).filter(|_| col == i);
+                                            vbar = (col == i).then_some(margin.label);
                                             if is_start {
                                                 continue;
                                             }
@@ -405,12 +405,12 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                                 corner = Some((label, is_start));
                                             }
                                         } else if !is_start {
-                                            vbar = vbar.or(Some(*label).filter(|_| !is_parent));
+                                            vbar = vbar.or((!is_parent).then_some(*label));
                                         }
                                     } else {
-                                        vbar = vbar.or(Some(*label).filter(|_| {
-                                            !is_parent && (is_start ^ (report_row < label_row))
-                                        }));
+                                        vbar = vbar.or((!is_parent
+                                            && (is_start ^ (report_row < label_row)))
+                                            .then_some(*label));
                                     }
                                 }
 
