@@ -46,13 +46,8 @@ impl<S: Span> Report<'_, S> {
         for label in self.labels.iter() {
             let label_source = label.span.source();
 
-            let src_display = cache.display(label_source);
-            let src = match cache.fetch(label_source) {
-                Ok(src) => src,
-                Err(e) => {
-                    eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), e);
-                    continue;
-                }
+            let Some((src, _)) = fetch_source(cache, label_source) else {
+                continue;
             };
 
             let given_label_span = label.span.start()..label.span.end();
@@ -190,26 +185,18 @@ impl<S: Span> Report<'_, S> {
 
         // --- Source sections ---
         let groups_len = groups.len();
-        for (
-            group_idx,
-            SourceGroup {
-                src_id,
-                char_span,
-                labels,
-            },
-        ) in groups.into_iter().enumerate()
-        {
-            let Some((src, src_name)) = fetch_source(&mut cache, src_id) else {
+        for (group_idx, group) in groups.into_iter().enumerate() {
+            let Some((src, src_name)) = fetch_source(&mut cache, group.src_id) else {
                 continue;
             };
 
-            let line_range = src.get_line_range(&char_span);
+            let line_range = src.get_line_range(&group.char_span);
 
             // File name & reference
-            let location = if src_id == self.span.source() {
+            let location = if group.src_id == self.span.source() {
                 self.span.start()
             } else {
-                labels[0].char_span.start
+                group.labels[0].char_span.start
             };
             let line_and_col = match self.config.index_type {
                 IndexType::Char => src.get_offset_line(location),
@@ -265,7 +252,7 @@ impl<S: Span> Report<'_, S> {
             // Generate a list of multi-line labels
             let mut multi_labels = Vec::new();
             let mut multi_labels_with_message = Vec::new();
-            for label_info in &labels {
+            for label_info in &group.labels {
                 if matches!(label_info.kind, LabelKind::Multiline) {
                     multi_labels.push(label_info);
                     if label_info.display_info.msg.is_some() {
@@ -524,7 +511,7 @@ impl<S: Span> Report<'_, S> {
                     })
                     .collect::<Vec<_>>();
 
-                for label_info in labels.iter().filter(|l| {
+                for label_info in group.labels.iter().filter(|l| {
                     l.char_span.start >= line.span().start && l.char_span.end <= line.span().end
                 }) {
                     if matches!(label_info.kind, LabelKind::Inline) {
