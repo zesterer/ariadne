@@ -206,13 +206,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         // Line number maximum width
         let line_no_width = groups
             .iter()
-            .map(|g| {
-                (1..)
-                    .map(|x| 10u32.pow(x))
-                    .take_while(|x| g.display_range.end as u32 / x != 0)
-                    .count()
-                    + 1
-            })
+            .map(|g| nb_digits(g.display_range.end))
             .max()
             .unwrap_or(0);
 
@@ -984,6 +978,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         }
         Ok(())
     }
+}
+
+/// Returns how many digits it takes to print `value`.
+fn nb_digits(value: usize) -> usize {
+    value.checked_ilog10().unwrap_or(0) as usize + 1
 }
 
 #[cfg(test)]
