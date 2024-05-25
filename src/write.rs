@@ -202,13 +202,7 @@ impl<S: Span> Report<'_, S> {
                     };
 
                     let line_range = src.get_line_range(char_span);
-                    Some(
-                        (1..)
-                            .map(|x| 10u32.pow(x))
-                            .take_while(|x| line_range.end as u32 / x != 0)
-                            .count()
-                            + 1,
-                    )
+                    Some(nb_digits(line_range.end))
                 },
             )
             .max()
@@ -917,6 +911,11 @@ impl<S: Span> Report<'_, S> {
         }
         Ok(())
     }
+}
+
+/// Returns how many digits it takes to print `value`.
+fn nb_digits(value: usize) -> usize {
+    value.checked_ilog10().unwrap_or(0) as usize + 1
 }
 
 #[cfg(test)]
