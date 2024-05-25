@@ -199,11 +199,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         let groups = self.get_source_groups(&mut cache);
 
         // Line number maximum width
-        let line_no_width = groups
-            .iter()
-            .map(|g| nb_digits(g.display_range.end))
-            .max()
-            .unwrap_or(0);
+        let line_no_width = max_line_no(&groups, &mut cache).map_or(0, nb_digits);
 
         // --- Source sections ---
         let groups_len = groups.len();
@@ -985,6 +981,16 @@ fn display_name<Id: ?Sized, C: Cache<Id>>(cache: &C, src_id: &Id) -> String {
         .display(src_id)
         .map(|d| d.to_string())
         .unwrap_or_else(|| "<unknown>".to_string())
+}
+
+fn max_line_no<S: Span, C: Cache<S::SourceId>>(
+    groups: &[SourceGroup<'_, S>],
+    cache: &mut C,
+) -> Option<usize> {
+    groups
+        .iter()
+        .map(|group| nb_digits(group.display_range.end))
+        .max()
 }
 
 /// Returns how many digits it takes to print `value`.
