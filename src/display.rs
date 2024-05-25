@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 
 #[derive(Copy, Clone, Debug)]
-pub struct Show<T>(pub T);
+pub(crate) struct Show<T>(pub T);
 
 impl<T: Display> Display for Show<Option<T>> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -13,7 +13,7 @@ impl<T: Display> Display for Show<Option<T>> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Rept<T>(pub T, pub usize);
+pub(crate) struct Rept<T>(pub T, pub usize);
 
 impl<T: Display> Display for Rept<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
