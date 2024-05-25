@@ -1,7 +1,7 @@
 use std::io;
 use std::ops::Range;
 
-use crate::{IndexType, LabelDisplay};
+use crate::{IndexType, LabelDisplay, Source};
 
 use super::draw::{self, StreamAwareFmt, StreamType};
 use super::{Cache, CharSet, LabelAttach, Report, Rept, Show, Span, Write};
@@ -183,21 +183,10 @@ impl<S: Span> Report<'_, S> {
                 |SourceGroup {
                      char_span, src_id, ..
                  }| {
-                    let src_name = cache
-                        .display(src_id)
-                        .map(|d| d.to_string())
-                        .unwrap_or_else(|| "<unknown>".to_string());
-
-                    let src = match cache.fetch(src_id) {
-                        Ok(src) => src,
-                        Err(e) => {
-                            eprintln!("Unable to fetch source {}: {:?}", src_name, e);
-                            return None;
-                        }
-                    };
-
-                    let line_range = src.get_line_range(char_span);
-                    Some(nb_digits(line_range.end))
+                    fetch_source(&mut cache, src_id).map(|(src, _)| {
+                        let line_range = src.get_line_range(char_span);
+                        nb_digits(line_range.end)
+                    })
                 },
             )
             .max()
@@ -214,17 +203,8 @@ impl<S: Span> Report<'_, S> {
             },
         ) in groups.into_iter().enumerate()
         {
-            let src_name = cache
-                .display(src_id)
-                .map(|d| d.to_string())
-                .unwrap_or_else(|| "<unknown>".to_string());
-
-            let src = match cache.fetch(src_id) {
-                Ok(src) => src,
-                Err(e) => {
-                    eprintln!("Unable to fetch source {}: {:?}", src_name, e);
-                    continue;
-                }
+            let Some((src, src_name)) = fetch_source(&mut cache, src_id) else {
+                continue;
             };
 
             let line_range = src.get_line_range(&char_span);
@@ -906,6 +886,27 @@ impl<S: Span> Report<'_, S> {
         }
         Ok(())
     }
+}
+
+fn fetch_source<'a, Id: ?Sized, C: Cache<Id>>(
+    cache: &'a mut C,
+    src_id: &Id,
+) -> Option<(&'a Source<C::Storage>, String)> {
+    let src_name = display_name(cache, src_id);
+    match cache.fetch(src_id) {
+        Ok(src) => Some((src, src_name)),
+        Err(e) => {
+            eprintln!("Unable to fetch source {}: {:?}", src_name, e);
+            None
+        }
+    }
+}
+
+fn display_name<Id: ?Sized, C: Cache<Id>>(cache: &C, src_id: &Id) -> String {
+    cache
+        .display(src_id)
+        .map(|d| d.to_string())
+        .unwrap_or_else(|| "<unknown>".to_string())
 }
 
 /// Returns how many digits it takes to print `value`.
