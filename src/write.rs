@@ -1,7 +1,7 @@
 use std::io;
 use std::ops::Range;
 
-use crate::{Config, IndexType, LabelDisplay};
+use crate::{Config, IndexType, LabelDisplay, Source};
 
 use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
 use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Rept, Show, Span, Write};
@@ -55,13 +55,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         for label in self.labels.iter() {
             let label_source = label.span.source();
 
-            let src_display = cache.display(label_source);
-            let src = match cache.fetch(label_source) {
-                Ok(src) => src,
-                Err(err) => {
-                    eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), err);
-                    continue;
-                }
+            let Some((src, _src_name)) = fetch_source(cache, label_source) else {
+                continue;
             };
 
             let given_label_span = label.span.start()..label.span.end();
@@ -222,17 +217,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             },
         ) in groups.into_iter().enumerate()
         {
-            let src_name = cache
-                .display(src_id)
-                .map(|d| d.to_string())
-                .unwrap_or_else(|| "<unknown>".to_string());
-
-            let src = match cache.fetch(src_id) {
-                Ok(src) => src,
-                Err(err) => {
-                    eprintln!("Unable to fetch source {src_name}: {err:?}");
-                    continue;
-                }
+            let Some((src, src_name)) = fetch_source(&mut cache, src_id) else {
+                continue;
             };
 
             // File name & reference
@@ -978,6 +964,27 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         }
         Ok(())
     }
+}
+
+fn fetch_source<'a, Id: ?Sized, C: Cache<Id>>(
+    cache: &'a mut C,
+    src_id: &Id,
+) -> Option<(&'a Source<C::Storage>, String)> {
+    let src_name = display_name(cache, src_id);
+    match cache.fetch(src_id) {
+        Ok(src) => Some((src, src_name)),
+        Err(err) => {
+            eprintln!("Unable to fetch source {src_name}: {err:?}");
+            None
+        }
+    }
+}
+
+fn display_name<Id: ?Sized, C: Cache<Id>>(cache: &C, src_id: &Id) -> String {
+    cache
+        .display(src_id)
+        .map(|d| d.to_string())
+        .unwrap_or_else(|| "<unknown>".to_string())
 }
 
 /// Returns how many digits it takes to print `value`.
