@@ -4,7 +4,7 @@ use std::ops::Range;
 use crate::{IndexType, LabelDisplay};
 
 use super::draw::{self, StreamAwareFmt, StreamType};
-use super::{Cache, CharSet, LabelAttach, Report, ReportKind, Show, Span, Write};
+use super::{Cache, CharSet, LabelAttach, Report, ReportKind, Rept, Show, Span, Write};
 
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
 //
@@ -262,7 +262,7 @@ impl<S: Span> Report<'_, S> {
             writeln!(
                 w,
                 "{}{}{}{} {} {}",
-                Show((' ', line_no_width + 2)),
+                Rept(' ', line_no_width + 2),
                 if group_idx == 0 {
                     draw.ltop
                 } else {
@@ -279,7 +279,7 @@ impl<S: Span> Report<'_, S> {
                 writeln!(
                     w,
                     "{}{}",
-                    Show((' ', line_no_width + 2)),
+                    Rept(' ', line_no_width + 2),
                     draw.vbar.fg(self.config.margin_color(), s)
                 )?;
             }
@@ -320,7 +320,7 @@ impl<S: Span> Report<'_, S> {
                     let line_no = format!("{}", idx + 1);
                     format!(
                         "{}{} {}",
-                        Show((' ', line_no_width - line_no.chars().count())),
+                        Rept(' ', line_no_width - line_no.chars().count()),
                         line_no,
                         draw.vbar,
                     )
@@ -328,7 +328,7 @@ impl<S: Span> Report<'_, S> {
                 } else {
                     format!(
                         "{}{}",
-                        Show((' ', line_no_width + 1)),
+                        Rept(' ', line_no_width + 1),
                         if is_ellipsis {
                             draw.vbar_gap
                         } else {
@@ -897,13 +897,13 @@ impl<S: Span> Report<'_, S> {
             if !self.config.compact {
                 if is_final_group {
                     let final_margin =
-                        format!("{}{}", Show((draw.hbar, line_no_width + 2)), draw.rbot);
+                        format!("{}{}", Rept(draw.hbar, line_no_width + 2), draw.rbot);
                     writeln!(w, "{}", final_margin.fg(self.config.margin_color(), s))?;
                 } else {
                     writeln!(
                         w,
                         "{}{}",
-                        Show((' ', line_no_width + 2)),
+                        Rept(' ', line_no_width + 2),
                         draw.vbar.fg(self.config.margin_color(), s)
                     )?;
                 }
