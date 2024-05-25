@@ -21,10 +21,13 @@ impl<'a, T, F: Fn(&mut fmt::Formatter, &'a T) -> fmt::Result> Display for Show<(
     }
 }
 
-impl<T: Display> Display for Show<(T, usize)> {
+#[derive(Copy, Clone, Debug)]
+pub struct Rept<T>(pub T, pub usize);
+
+impl<T: Display> Display for Rept<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for _ in 0..self.0 .1 {
-            write!(f, "{}", self.0 .0)?;
+        for _ in 0..self.1 {
+            write!(f, "{}", self.0)?;
         }
         Ok(())
     }
