@@ -76,6 +76,14 @@ impl Characters {
             underline: '^',
         }
     }
+
+    pub(crate) fn vbar(&self, is_gap: bool) -> char {
+        if is_gap {
+            self.vbar_gap
+        } else {
+            self.vbar
+        }
+    }
 }
 
 /// Output stream to check for whether color is enabled.
