@@ -311,14 +311,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
             let write_margin = |w: &mut WrappedWriter<W>,
                                 idx: usize,
-                                is_line: bool,
+                                is_src_line: bool,
                                 is_ellipsis: bool,
                                 draw_labels: bool,
                                 report_row: Option<(usize, bool)>,
                                 line_labels: &[LineLabel],
                                 margin_label: &Option<LineLabel>|
              -> std::io::Result<()> {
-                let line_no_margin = if is_line && !is_ellipsis {
+                let line_no_margin = if is_src_line && !is_ellipsis {
                     format!("{:line_no_width$} {}", idx + 1, draw.vbar)
                         .fg(self.config.margin_color(), s)
                 } else {
@@ -361,9 +361,9 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 let is_start = line_span.contains(&label.char_span.start);
                                 let is_end = line_span.contains(&label.last_offset());
 
-                                if let Some(margin) = margin.filter(|_| is_line) {
+                                if let Some(margin) = margin.filter(|_| is_src_line) {
                                     margin_ptr = Some((margin, is_start));
-                                } else if !is_start && (!is_end || is_line) {
+                                } else if !is_start && (!is_end || is_src_line) {
                                     vbar = vbar.or((!is_parent).then_some(*label));
                                 } else if let Some((report_row, is_arrow)) = report_row {
                                     let label_row = line_labels
@@ -395,14 +395,17 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 }
 
                                 if let Some(margin) = margin_label.as_ref().filter(|m| {
-                                    is_end && is_line && std::ptr::eq(*label, m.label) && col > i
+                                    is_end
+                                        && is_src_line
+                                        && std::ptr::eq(*label, m.label)
+                                        && col > i
                                 }) {
                                     hbar = Some(margin.label);
                                 }
                             }
                         }
 
-                        if let (Some((margin, _is_start)), true) = (margin_ptr, is_line) {
+                        if let (Some((margin, _is_start)), true) = (margin_ptr, is_src_line) {
                             let is_col =
                                 multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
                             let is_limit = col + 1 == multi_labels_with_message.len();
@@ -415,7 +418,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         //     margin_label
                         //         .as_ref()
                         //         .map_or(true, |margin| !std::ptr::eq(margin.label, *l))
-                        //         || !is_line
+                        //         || !is_src_line
                         // });
 
                         let (a, b) = if let Some((label, is_start)) = corner {
@@ -433,7 +436,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 },
                                 draw.hbar.fg(h_label.display_info.color, s),
                             )
-                        } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
+                        } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
                             let is_col =
                                 multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
                             let is_limit = col == multi_labels_with_message.len();
