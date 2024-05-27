@@ -284,7 +284,7 @@ impl fmt::Display for ReportKind<'_> {
             ReportKind::Error => write!(f, "Error"),
             ReportKind::Warning => write!(f, "Warning"),
             ReportKind::Advice => write!(f, "Advice"),
-            ReportKind::Custom(s, _) => write!(f, "{}", s),
+            ReportKind::Custom(s, _) => write!(f, "{s}"),
         }
     }
 }
