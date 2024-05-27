@@ -165,7 +165,7 @@ impl<S: Span> Report<'_, S> {
 
         // --- Header ---
 
-        let code = self.code.as_ref().map(|c| format!("[{}] ", c));
+        let code = self.code.as_ref().map(|c| format!("[{c}] "));
         let id = format!("{}{}:", Show(code), self.kind);
         let kind_color = self.kind.color(&self.config);
         writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
@@ -206,7 +206,7 @@ impl<S: Span> Report<'_, S> {
             let line_ref = format!(":{}:{}", line_no, col_no);
             writeln!(
                 w,
-                "{}{}{}{}{}{}{}",
+                "{}{}{}{}{src_name}{line_ref}{}",
                 Rept(' ', line_no_width + 2),
                 if group_idx == 0 {
                     draw.ltop
@@ -216,8 +216,6 @@ impl<S: Span> Report<'_, S> {
                 .fg(self.config.margin_color(), s),
                 draw.hbar.fg(self.config.margin_color(), s),
                 draw.lbox.fg(self.config.margin_color(), s),
-                src_name,
-                line_ref,
                 draw.rbox.fg(self.config.margin_color(), s),
             )?;
 
@@ -265,9 +263,8 @@ impl<S: Span> Report<'_, S> {
                 let line_no_margin = if is_line && !is_ellipsis {
                     let line_no = format!("{}", idx + 1);
                     format!(
-                        "{}{} {}",
+                        "{}{line_no} {}",
                         Rept(' ', line_no_width - line_no.chars().count()),
-                        line_no,
                         draw.vbar,
                     )
                     .fg(self.config.margin_color(), s)
@@ -286,8 +283,7 @@ impl<S: Span> Report<'_, S> {
 
                 write!(
                     w,
-                    " {}{}",
-                    line_no_margin,
+                    " {line_no_margin}{}",
                     Show((!self.config.compact).then_some(' ')),
                 )?;
 
@@ -422,9 +418,9 @@ impl<S: Span> Report<'_, S> {
                         } else {
                             (' '.fg(None, s), ' '.fg(None, s))
                         };
-                        write!(w, "{}", a)?;
+                        write!(w, "{a}")?;
                         if !self.config.compact {
-                            write!(w, "{}", b)?;
+                            write!(w, "{b}")?;
                         }
                     }
                 }
@@ -780,10 +776,10 @@ impl<S: Span> Report<'_, S> {
                         };
 
                         if width > 0 {
-                            write!(w, "{}", c)?;
+                            write!(w, "{c}")?;
                         }
                         for _ in 1..width {
-                            write!(w, "{}", tail)?;
+                            write!(w, "{tail}")?;
                         }
                     }
                     if line_label.draw_msg {
@@ -802,7 +798,7 @@ impl<S: Span> Report<'_, S> {
                     writeln!(w)?;
                 }
                 write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                writeln!(w, "{}: {}", "Help".fg(self.config.note_color(), s), note)?;
+                writeln!(w, "{}: {note}", "Help".fg(self.config.note_color(), s))?;
             }
 
             // Note
@@ -812,7 +808,7 @@ impl<S: Span> Report<'_, S> {
                     writeln!(w)?;
                 }
                 write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                writeln!(w, "{}: {}", "Note".fg(self.config.note_color(), s), note)?;
+                writeln!(w, "{}: {note}", "Note".fg(self.config.note_color(), s))?;
             }
 
             // Tail of report
@@ -843,7 +839,7 @@ fn fetch_source<'a, Id: ?Sized, C: Cache<Id>>(
     match cache.fetch(src_id) {
         Ok(src) => Some((src, src_name)),
         Err(e) => {
-            eprintln!("Unable to fetch source {}: {:?}", src_name, e);
+            eprintln!("Unable to fetch source {src_name}: {e:?}");
             None
         }
     }

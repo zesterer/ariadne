@@ -6,7 +6,7 @@ pub(crate) struct Show<T>(pub Option<T>);
 impl<T: Display> Display for Show<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.0 {
-            Some(x) => write!(f, "{}", x),
+            Some(x) => write!(f, "{x}"),
             None => Ok(()),
         }
     }
