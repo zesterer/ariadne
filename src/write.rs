@@ -268,16 +268,8 @@ impl<S: Span> Report<'_, S> {
                     format!("{:line_no_width$} {}", idx + 1, draw.vbar)
                         .fg(self.config.margin_color(), s)
                 } else {
-                    format!(
-                        "{}{}",
-                        Rept(' ', line_no_width + 1),
-                        if is_ellipsis {
-                            draw.vbar_gap
-                        } else {
-                            draw.vbar
-                        }
-                    )
-                    .fg(self.config.skipped_margin_color(), s)
+                    format!("{}{}", Rept(' ', line_no_width + 1), draw.vbar(is_ellipsis))
+                        .fg(self.config.skipped_margin_color(), s)
                 };
 
                 write!(
@@ -386,12 +378,7 @@ impl<S: Span> Report<'_, S> {
                             )
                         } else if let Some(label) = vbar {
                             (
-                                if is_ellipsis {
-                                    draw.vbar_gap
-                                } else {
-                                    draw.vbar
-                                }
-                                .fg(label.display_info.color, s),
+                                draw.vbar(is_ellipsis).fg(label.display_info.color, s),
                                 ' '.fg(None, s),
                             )
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
