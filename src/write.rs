@@ -245,7 +245,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             let line_ref = format!("{src_name}:{line_no}:{col_no}");
             writeln!(
                 w,
-                "{}{}{}{} {} {}",
+                "{}{}{}{} {line_ref} {}",
                 Rept(' ', line_no_width + 2).fg(self.config.margin_color(), s),
                 if group_idx == 0 {
                     draw.ltop
@@ -255,7 +255,6 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 .fg(self.config.margin_color(), s),
                 draw.hbar.fg(self.config.margin_color(), s),
                 draw.lbox.fg(self.config.margin_color(), s),
-                line_ref,
                 draw.rbox.fg(self.config.margin_color(), s),
             )?;
 
@@ -322,9 +321,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 let line_no_margin = if is_line && !is_ellipsis {
                     let line_no = format!("{}", idx + 1);
                     format!(
-                        "{}{} {}",
+                        "{}{line_no} {}",
                         Rept(' ', line_no_width - line_no.chars().count()),
-                        line_no,
                         draw.line_margin,
                     )
                     .fg(self.config.margin_color(), s)
@@ -343,8 +341,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
                 write!(
                     w,
-                    " {}{}",
-                    line_no_margin,
+                    " {line_no_margin}{}",
                     Show((!self.config.compact).then_some(' ')),
                 )?;
 
@@ -891,19 +888,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     if let Some(line) = lines.next() {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
                         if self.help.len() > 1 {
-                            writeln!(
-                                w,
-                                "{}: {}",
-                                help_prefix.fg(self.config.note_color(), s),
-                                line
-                            )?;
+                            writeln!(w, "{}: {line}", help_prefix.fg(self.config.note_color(), s))?;
                         } else {
-                            writeln!(w, "{}: {}", "Help".fg(self.config.note_color(), s), line)?;
+                            writeln!(w, "{}: {line}", "Help".fg(self.config.note_color(), s))?;
                         }
                     }
                     for line in lines {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        writeln!(w, "{:>pad$}{}", "", line, pad = help_prefix_len + 2)?;
+                        writeln!(w, "{:>pad$}{line}", "", pad = help_prefix_len + 2)?;
                     }
                 }
             }
@@ -925,19 +917,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     if let Some(line) = lines.next() {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
                         if self.notes.len() > 1 {
-                            writeln!(
-                                w,
-                                "{}: {}",
-                                note_prefix.fg(self.config.note_color(), s),
-                                line
-                            )?;
+                            writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
                         } else {
-                            writeln!(w, "{}: {}", "Note".fg(self.config.note_color(), s), line)?;
+                            writeln!(w, "{}: {line}", "Note".fg(self.config.note_color(), s))?;
                         }
                     }
                     for line in lines {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        writeln!(w, "{:>pad$}{}", "", line, pad = note_prefix_len + 2)?;
+                        writeln!(w, "{:>pad$}{line}", "", pad = note_prefix_len + 2)?;
                     }
                 }
             }
