@@ -265,13 +265,8 @@ impl<S: Span> Report<'_, S> {
                                 margin_label: &Option<LineLabel>|
              -> std::io::Result<()> {
                 let line_no_margin = if is_line && !is_ellipsis {
-                    let line_no = format!("{}", idx + 1);
-                    format!(
-                        "{}{line_no} {}",
-                        Rept(' ', line_no_width - line_no.chars().count()),
-                        draw.vbar,
-                    )
-                    .fg(self.config.margin_color(), s)
+                    format!("{:line_no_width$} {}", idx + 1, draw.vbar)
+                        .fg(self.config.margin_color(), s)
                 } else {
                     format!(
                         "{}{}",
