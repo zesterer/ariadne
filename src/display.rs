@@ -1,9 +1,9 @@
 use std::fmt::{self, Display};
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct Show<T>(pub T);
+pub(crate) struct Show<T>(pub Option<T>);
 
-impl<T: Display> Display for Show<Option<T>> {
+impl<T: Display> Display for Show<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.0 {
             Some(x) => write!(f, "{x}"),
