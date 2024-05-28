@@ -1,6 +1,8 @@
+use std::fmt::Display;
 use std::io;
 use std::ops::Range;
 
+use crate::source::Location;
 use crate::{Config, IndexType, LabelDisplay, Source};
 
 use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
@@ -67,45 +69,50 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         continue;
                     };
                     let end_line = if given_label_span.start >= given_label_span.end {
-                        start_line.1
+                        start_line.line_idx
                     } else {
                         let Some(end_line) = src.get_offset_line(given_label_span.end - 1) else {
                             continue;
                         };
-                        end_line.1
+                        end_line.line_idx
                     };
-                    (given_label_span, start_line.1, end_line)
+                    (given_label_span, start_line.line_idx, end_line)
                 }
                 IndexType::Byte => {
-                    let Some((start_line_obj, start_line, start_byte_col)) =
-                        src.get_byte_line(given_label_span.start)
-                    else {
+                    let Some(start_location) = src.get_byte_line(given_label_span.start) else {
                         continue;
                     };
-                    let line_text = src.get_line_text(start_line_obj).unwrap();
+                    let line_text = src.get_line_text(start_location.line).unwrap();
 
-                    let num_chars_before_start = line_text[..start_byte_col.min(line_text.len())]
+                    let num_chars_before_start = line_text
+                        [..start_location.col_idx.min(line_text.len())]
                         .chars()
                         .count();
-                    let start_char_offset = start_line_obj.offset() + num_chars_before_start;
+                    let start_char_offset = start_location.line.offset() + num_chars_before_start;
 
                     if given_label_span.start >= given_label_span.end {
-                        (start_char_offset..start_char_offset, start_line, start_line)
+                        (
+                            start_char_offset..start_char_offset,
+                            start_location.line_idx,
+                            start_location.line_idx,
+                        )
                     } else {
                         // We can subtract 1 from end, because get_byte_line doesn't actually index into the text.
                         let end_pos = given_label_span.end - 1;
-                        let Some((end_line_obj, end_line, end_byte_col)) =
-                            src.get_byte_line(end_pos)
-                        else {
+                        let Some(end_location) = src.get_byte_line(end_pos) else {
                             continue;
                         };
-                        let end_line_text = src.get_line_text(end_line_obj).unwrap();
+                        let end_line_text = src.get_line_text(end_location.line).unwrap();
                         // Have to add 1 back now, so we don't cut a char in two.
                         let num_chars_before_end =
-                            end_line_text[..end_byte_col + 1].chars().count();
-                        let end_char_offset = end_line_obj.offset() + num_chars_before_end;
+                            end_line_text[..end_location.col_idx + 1].chars().count();
+                        let end_char_offset = end_location.line.offset() + num_chars_before_end;
 
-                        (start_char_offset..end_char_offset, start_line, end_line)
+                        (
+                            start_char_offset..end_char_offset,
+                            start_location.line_idx,
+                            end_location.line_idx,
+                        )
                     }
                 }
             };
@@ -224,28 +231,29 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 // This has already been converted from bytes to chars, if applicable.
                 (labels[0].char_span.start, IndexType::Char)
             };
-            let line_and_col = match index_type {
-                IndexType::Char => src.get_offset_line(location),
-                IndexType::Byte => src.get_byte_line(location).map(|(line_obj, idx, col)| {
-                    let line_text = src.get_line_text(line_obj).unwrap();
+            let location = Loc(
+                src,
+                src_name,
+                match index_type {
+                    IndexType::Char => src.get_offset_line(location),
+                    IndexType::Byte => src.get_byte_line(location).map(|location| {
+                        let line_text = src.get_line_text(location.line).unwrap();
 
-                    let col = line_text[..col.min(line_text.len())].chars().count();
+                        let col = line_text[..location.col_idx.min(line_text.len())]
+                            .chars()
+                            .count();
 
-                    (line_obj, idx, col)
-                }),
-            };
-            let (line_no, col_no) = line_and_col
-                .map(|(_, idx, col)| {
-                    (
-                        format!("{}", idx + 1 + src.display_line_offset()),
-                        format!("{}", col + 1),
-                    )
-                })
-                .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
-            let line_ref = format!("{src_name}:{line_no}:{col_no}");
+                        Location {
+                            line: location.line,
+                            line_idx: location.line_idx,
+                            col_idx: col,
+                        }
+                    }),
+                },
+            );
             writeln!(
                 w,
-                "{}{}{}{} {line_ref} {}",
+                "{}{}{}{} {location} {}",
                 Rept(' ', line_no_width + 2).fg(self.config.margin_color(), s),
                 if group_idx == 0 {
                     draw.ltop
@@ -485,9 +493,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
             let mut is_ellipsis = false;
             for idx in display_range {
-                let line = if let Some(line) = src.line(idx) {
-                    line
-                } else {
+                let Some(line) = src.line(idx) else {
                     continue;
                 };
 
@@ -968,6 +974,24 @@ fn max_line_no<S: Span, C: Cache<S::SourceId>>(
 /// Returns how many digits it takes to print `value`.
 fn nb_digits(value: usize) -> usize {
     value.checked_ilog10().unwrap_or(0) as usize + 1
+}
+
+#[derive(Debug, Clone)]
+struct Loc<'src, I: AsRef<str>>(&'src Source<I>, String, Option<Location>);
+
+impl<I: AsRef<str>> Display for Loc<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.2.as_ref() {
+            Some(location) => write!(
+                f,
+                "{}:{}:{}",
+                self.1,
+                location.line_idx + 1 + self.0.display_line_offset(),
+                location.col_idx + 1,
+            ),
+            None => write!(f, ":?:?"),
+        }
+    }
 }
 
 #[cfg(test)]
