@@ -179,7 +179,7 @@ impl<S: Span> Report<'_, S> {
         let groups = self.get_source_groups(&mut cache);
 
         // Line number maximum width
-        let line_no_width = max_line_no(&groups, &mut cache).map_or(0, nb_digits);
+        let line_num_width = max_line_num(&groups, &mut cache).map_or(0, nb_digits);
 
         // --- Source sections ---
         let groups_len = groups.len();
@@ -219,13 +219,9 @@ impl<S: Span> Report<'_, S> {
             writeln!(
                 w,
                 "{}{}{}{} {location} {}",
-                Rept(' ', line_no_width + 2),
-                if group_idx == 0 {
-                    draw.ltop
-                } else {
-                    draw.lcross
-                }
-                .fg(self.config.margin_color(), s),
+                Rept(' ', line_num_width + 2),
+                draw.group_connector(group_idx == 0)
+                    .fg(self.config.margin_color(), s),
                 draw.hbar.fg(self.config.margin_color(), s),
                 draw.lbox.fg(self.config.margin_color(), s),
                 draw.rbox.fg(self.config.margin_color(), s),
@@ -235,7 +231,7 @@ impl<S: Span> Report<'_, S> {
                 writeln!(
                     w,
                     "{}{}",
-                    Rept(' ', line_no_width + 2),
+                    Rept(' ', line_num_width + 2),
                     draw.vbar.fg(self.config.margin_color(), s)
                 )?;
             }
@@ -272,17 +268,21 @@ impl<S: Span> Report<'_, S> {
                                 line_labels: &[LineLabel],
                                 margin_label: &Option<LineLabel>|
              -> std::io::Result<()> {
-                let line_no_margin = if is_src_line && !is_ellipsis {
-                    format!("{:line_no_width$} {}", idx + 1, draw.vbar)
+                let line_num_margin = if is_src_line && !is_ellipsis {
+                    format!("{:line_num_width$} {}", idx + 1, draw.vbar)
                         .fg(self.config.margin_color(), s)
                 } else {
-                    format!("{}{}", Rept(' ', line_no_width + 1), draw.vbar(is_ellipsis))
-                        .fg(self.config.skipped_margin_color(), s)
+                    format!(
+                        "{}{}",
+                        Rept(' ', line_num_width + 1),
+                        draw.vbar(is_ellipsis)
+                    )
+                    .fg(self.config.skipped_margin_color(), s)
                 };
 
                 write!(
                     w,
-                    " {line_no_margin}{}",
+                    " {line_num_margin}{}",
                     Show((!self.config.compact).then_some(' ')),
                 )?;
 
@@ -826,13 +826,13 @@ impl<S: Span> Report<'_, S> {
             if !self.config.compact {
                 if is_final_group {
                     let final_margin =
-                        format!("{}{}", Rept(draw.hbar, line_no_width + 2), draw.rbot);
+                        format!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot);
                     writeln!(w, "{}", final_margin.fg(self.config.margin_color(), s))?;
                 } else {
                     writeln!(
                         w,
                         "{}{}",
-                        Rept(' ', line_no_width + 2),
+                        Rept(' ', line_num_width + 2),
                         draw.vbar.fg(self.config.margin_color(), s)
                     )?;
                 }
@@ -863,7 +863,7 @@ fn display_name<Id: ?Sized, C: Cache<Id>>(cache: &C, src_id: &Id) -> String {
         .unwrap_or_else(|| "<unknown>".to_string())
 }
 
-fn max_line_no<S: Span, C: Cache<S::SourceId>>(
+fn max_line_num<S: Span, C: Cache<S::SourceId>>(
     groups: &[SourceGroup<'_, S>],
     cache: &mut C,
 ) -> Option<usize> {
