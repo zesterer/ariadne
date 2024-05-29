@@ -185,6 +185,8 @@ impl<S: Span> Report<'_, S> {
         // Line number maximum width
         let line_num_width = max_line_num(&groups, &mut cache).map_or(0, nb_digits);
 
+        let margin_char = |c: char| c.fg(self.config.margin_color(), s);
+
         // --- Source sections ---
         let groups_len = groups.len();
         for (group_idx, group) in groups.into_iter().enumerate() {
@@ -225,11 +227,10 @@ impl<S: Span> Report<'_, S> {
                 w,
                 "{}{}{}{} {location} {}",
                 Rept(' ', line_num_width + 2),
-                draw.group_connector(group_idx == 0)
-                    .fg(self.config.margin_color(), s),
-                draw.hbar.fg(self.config.margin_color(), s),
-                draw.lbox.fg(self.config.margin_color(), s),
-                draw.rbox.fg(self.config.margin_color(), s),
+                margin_char(draw.group_connector(group_idx == 0)),
+                margin_char(draw.hbar),
+                margin_char(draw.lbox),
+                margin_char(draw.rbox),
             )?;
 
             if !self.config.compact {
@@ -237,7 +238,7 @@ impl<S: Span> Report<'_, S> {
                     w,
                     "{}{}",
                     Rept(' ', line_num_width + 2),
-                    draw.vbar.fg(self.config.margin_color(), s)
+                    margin_char(draw.vbar)
                 )?;
             }
 
@@ -819,15 +820,18 @@ impl<S: Span> Report<'_, S> {
             // Tail of report
             if !self.config.compact {
                 if is_final_group {
-                    let final_margin =
-                        format!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot);
-                    writeln!(w, "{}", final_margin.fg(self.config.margin_color(), s))?;
+                    writeln!(
+                        w,
+                        "{}",
+                        format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
+                            .fg(self.config.margin_color(), s)
+                    )?;
                 } else {
                     writeln!(
                         w,
                         "{}{}",
                         Rept(' ', line_num_width + 2),
-                        draw.vbar.fg(self.config.margin_color(), s)
+                        margin_char(draw.vbar)
                     )?;
                 }
             }
