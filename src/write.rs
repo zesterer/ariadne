@@ -424,6 +424,8 @@ impl<S: Span> Report<'_, S> {
                     continue;
                 };
 
+                // The (optional) label whose arrows are drawn in the margin (horizontal),
+                // instead of normally (vertical).
                 let margin_label = multi_labels_with_message
                     .iter()
                     .enumerate()
@@ -480,28 +482,31 @@ impl<S: Span> Report<'_, S> {
                             None
                         }
                     })
-                    .collect::<Vec<_>>();
-
-                for label_info in group.labels.iter().filter(|l| {
-                    l.char_span.start >= line.span().start && l.char_span.end <= line.span().end
-                }) {
-                    if matches!(label_info.kind, LabelKind::Inline) {
-                        line_labels.push(LineLabel {
-                            col: match &self.config.label_attach {
-                                LabelAttach::Start => label_info.char_span.start,
-                                LabelAttach::Middle => {
-                                    (label_info.char_span.start + label_info.char_span.end) / 2
+                    .chain(
+                        group
+                            .labels
+                            .iter()
+                            .filter(|label_info| {
+                                matches!(label_info.kind, LabelKind::Inline)
+                                    && label_info.char_span.start >= line.span().start
+                                    && label_info.char_span.end <= line.span().end
+                            })
+                            .map(|label_info| LineLabel {
+                                col: match &self.config.label_attach {
+                                    LabelAttach::Start => label_info.char_span.start,
+                                    LabelAttach::Middle => {
+                                        (label_info.char_span.start + label_info.char_span.end) / 2
+                                    }
+                                    LabelAttach::End => label_info.last_offset(),
                                 }
-                                LabelAttach::End => label_info.last_offset(),
-                            }
-                            .max(label_info.char_span.start)
-                                - line.offset(),
-                            label: label_info,
-                            multi: false,
-                            draw_msg: true,
-                        });
-                    }
-                }
+                                .max(label_info.char_span.start)
+                                    - line.offset(),
+                                label: label_info,
+                                multi: false,
+                                draw_msg: true,
+                            }),
+                    )
+                    .collect::<Vec<_>>();
 
                 // Skip this line if we don't have labels for it
                 if line_labels.is_empty() && margin_label.is_none() {
