@@ -358,52 +358,47 @@ impl<S: Span> Report<'_, S> {
 
                         let (a, b) = if let Some((label, is_start)) = corner {
                             (
-                                if is_start { draw.ltop } else { draw.lbot }
-                                    .fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
+                                Some((if is_start { draw.ltop } else { draw.lbot }, *label)),
+                                Some((draw.hbar, *label)),
                             )
                         } else if let Some(label) =
                             hbar.filter(|_| vbar.is_some() && !self.config.cross_gap)
                         {
-                            (
-                                draw.xbar.fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
-                            )
+                            (Some((draw.xbar, label)), Some((draw.hbar, label)))
                         } else if let Some(label) = hbar {
-                            (
-                                draw.hbar.fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
-                            )
+                            (Some((draw.hbar, label)), Some((draw.hbar, label)))
                         } else if let Some(label) = vbar {
-                            (
-                                draw.vbar(is_ellipsis).fg(label.display_info.color, s),
-                                ' '.fg(None, s),
-                            )
+                            (Some((draw.vbar(is_ellipsis), label)), None)
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
                             let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
                             let is_limit = col == multi_labels_with_message.len();
                             (
-                                if is_limit {
-                                    draw.rarrow
-                                } else if is_col {
-                                    if is_start {
-                                        draw.ltop
+                                Some((
+                                    if is_limit {
+                                        draw.rarrow
+                                    } else if is_col {
+                                        if is_start {
+                                            draw.ltop
+                                        } else {
+                                            draw.lcross
+                                        }
                                     } else {
-                                        draw.lcross
-                                    }
-                                } else {
-                                    draw.hbar
-                                }
-                                .fg(margin.label.display_info.color, s),
-                                if !is_limit { draw.hbar } else { ' ' }
-                                    .fg(margin.label.display_info.color, s),
+                                        draw.hbar
+                                    },
+                                    margin.label,
+                                )),
+                                Some((if !is_limit { draw.hbar } else { ' ' }, margin.label)),
                             )
                         } else {
-                            (' '.fg(None, s), ' '.fg(None, s))
+                            (None, None)
                         };
-                        write!(w, "{a}")?;
+                        let arrow_char = |opt: Option<(char, &LabelInfo<'_>)>| match opt {
+                            Some((c, label)) => c.fg(label.display_info.color, s),
+                            None => ' '.fg(None, s),
+                        };
+                        write!(w, "{}", arrow_char(a))?;
                         if !self.config.compact {
-                            write!(w, "{b}")?;
+                            write!(w, "{}", arrow_char(b))?;
                         }
                     }
                 }
