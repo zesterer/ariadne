@@ -172,9 +172,13 @@ impl<S: Span> Report<'_, S> {
         // --- Header ---
 
         let code = self.code.as_ref().map(|c| format!("[{c}] "));
-        let id = format!("{}{}:", Show(code), self.kind);
         let kind_color = self.kind.color(&self.config);
-        writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
+        writeln!(
+            w,
+            "{} {}",
+            format_args!("{}{}:", Show(code), self.kind).fg(kind_color, s),
+            Show(self.msg.as_ref())
+        )?;
 
         let groups = self.get_source_groups(&mut cache);
 
@@ -449,8 +453,7 @@ impl<S: Span> Report<'_, S> {
                 // Generate a list of labels for this line, along with their label columns
                 let mut line_labels = multi_labels_with_message
                     .iter()
-                    .enumerate()
-                    .filter_map(|(_i, label)| {
+                    .filter_map(|label| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start
@@ -463,7 +466,7 @@ impl<S: Span> Report<'_, S> {
                                 col: label.char_span.start - line.offset(),
                                 label,
                                 multi: true,
-                                draw_msg: false, // Multi-line spans don;t have their messages drawn at the start
+                                draw_msg: false, // Multi-line spans don't have their messages drawn at the start
                             })
                         } else if is_end {
                             Some(LineLabel {
