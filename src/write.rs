@@ -350,23 +350,30 @@ impl<S: Span> Report<'_, S> {
                         }
 
                         hbar = hbar.filter(|l| {
-                            margin_label
+                            !margin_label
                                 .as_ref()
-                                .map_or(true, |margin| !margin.is_referencing(l))
+                                .map_or(false, |margin| margin.is_referencing(l))
                                 || !is_src_line
                         });
 
                         let (a, b) = if let Some((label, is_start)) = corner {
                             (
-                                Some((if is_start { draw.ltop } else { draw.lbot }, *label)),
+                                Some((draw.arrow_bend(is_start), *label)),
                                 Some((draw.hbar, *label)),
                             )
-                        } else if let Some(label) =
-                            hbar.filter(|_| vbar.is_some() && !self.config.cross_gap)
-                        {
-                            (Some((draw.xbar, label)), Some((draw.hbar, label)))
                         } else if let Some(label) = hbar {
-                            (Some((draw.hbar, label)), Some((draw.hbar, label)))
+                            (
+                                Some((
+                                    if vbar.is_some() && !self.config.cross_gap {
+                                        // Crossing with a vertical arrow, and the config allows us to cross them.
+                                        draw.xbar
+                                    } else {
+                                        draw.hbar
+                                    },
+                                    label,
+                                )),
+                                Some((draw.hbar, label)),
+                            )
                         } else if let Some(label) = vbar {
                             (Some((draw.vbar(is_ellipsis), label)), None)
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
@@ -387,11 +394,12 @@ impl<S: Span> Report<'_, S> {
                                     },
                                     margin.label,
                                 )),
-                                Some((if !is_limit { draw.hbar } else { ' ' }, margin.label)),
+                                Some((if is_limit { ' ' } else { draw.hbar }, margin.label)),
                             )
                         } else {
                             (None, None)
                         };
+
                         let arrow_char = |opt: Option<(char, &LabelInfo<'_>)>| match opt {
                             Some((c, label)) => c.fg(label.display_info.color, s),
                             None => ' '.fg(None, s),
