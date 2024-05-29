@@ -777,22 +777,22 @@ impl<S: Span> Report<'_, S> {
             let is_final_group = group_idx + 1 == groups_len;
 
             // Help
-            if let (Some(note), true) = (&self.help, is_final_group) {
+            if let (Some(help), true) = (&self.help, is_final_group) {
                 if !self.config.compact {
-                    write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                    write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                     writeln!(w)?;
                 }
-                write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                writeln!(w, "{}: {note}", "Help".fg(self.config.note_color(), s))?;
+                write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
+                writeln!(w, "{}: {help}", "Help".fg(self.config.note_color(), s))?;
             }
 
             // Note
             if let (Some(note), true) = (&self.note, is_final_group) {
                 if !self.config.compact {
-                    write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                    write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                     writeln!(w)?;
                 }
-                write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                 writeln!(w, "{}: {note}", "Note".fg(self.config.note_color(), s))?;
             }
 
