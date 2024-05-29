@@ -87,6 +87,14 @@ impl Characters {
         }
     }
 
+    pub(crate) fn arrow_bend(&self, is_top: bool) -> char {
+        if is_top {
+            self.ltop
+        } else {
+            self.lbot
+        }
+    }
+
     pub(crate) fn vbar(&self, is_gap: bool) -> char {
         if is_gap {
             self.vbar_gap

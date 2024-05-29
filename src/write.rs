@@ -415,13 +415,13 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         // hbar = hbar.filter(|l| {
                         //     margin_label
                         //         .as_ref()
-                        //         .map_or(true, |margin| !margin.is_referencing(l))
+                        //         .map_or(false, |margin| !margin.is_referencing(l))
                         //         || !is_src_line
                         // });
 
                         let (a, b) = if let Some((label, is_start)) = corner {
                             (
-                                Some((if is_start { draw.ltop } else { draw.lbot }, *label)),
+                                Some((draw.arrow_bend(is_start), *label)),
                                 Some((draw.hbar, *label)),
                             )
                         } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
@@ -455,7 +455,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                     },
                                     margin.label,
                                 )),
-                                Some((if !is_limit { draw.hbar } else { ' ' }, margin.label)),
+                                Some((if is_limit { ' ' } else { draw.hbar }, margin.label)),
                             )
                         } else if let Some(label) = hbar {
                             (Some((draw.hbar, label)), Some((draw.hbar, label)))
@@ -464,6 +464,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         } else {
                             (None, None)
                         };
+
                         let arrow_char = |opt: Option<(char, &LabelInfo<'_>)>| match opt {
                             Some((c, label)) => c.fg(label.display_info.color, s),
                             None => ' '.fg(None, s),
