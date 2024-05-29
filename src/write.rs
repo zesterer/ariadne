@@ -271,13 +271,6 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 )?;
             }
 
-            struct LineLabel<'a> {
-                col: usize,
-                label: &'a LabelInfo<'a>,
-                multi: Option<usize>,
-                draw_msg: bool,
-            }
-
             // Generate a list of multi-line labels
             let mut multi_labels = Vec::new();
             let mut multi_labels_with_message = Vec::new();
@@ -358,9 +351,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                             .iter()
                             .enumerate()
                         {
-                            let margin = margin_label
-                                .as_ref()
-                                .filter(|m| std::ptr::eq(*label, m.label));
+                            let margin = margin_label.as_ref().filter(|m| m.is_referencing(label));
 
                             if label.char_span.start < line_span.end
                                 && label.char_span.end > line_span.start
@@ -369,7 +360,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 let is_start = line_span.contains(&label.char_span.start);
                                 let is_end = line_span.contains(&label.last_offset());
 
-                                if let Some(margin) = margin.filter(|_| is_src_line) {
+                                if let (Some(margin), true) = (margin, is_src_line) {
                                     margin_ptr = Some((margin, is_start));
                                 } else if !is_start && (!is_end || is_src_line) {
                                     vbar = vbar.or((!is_parent).then_some(*label));
@@ -377,7 +368,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                     let label_row = line_labels
                                         .iter()
                                         .enumerate()
-                                        .find(|(_, l)| std::ptr::eq(*label, l.label))
+                                        .find(|(_, l)| l.is_referencing(label))
                                         .map_or(0, |(r, _)| r);
                                     if report_row == label_row {
                                         if let Some(margin) = margin {
@@ -414,8 +405,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
 
                         if let (Some((margin, _is_start)), true) = (margin_ptr, is_src_line) {
-                            let is_col =
-                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
+                            let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
                             let is_limit = col + 1 == multi_labels_with_message.len();
                             if !is_col && !is_limit {
                                 hbar = hbar.or(Some(margin.label));
@@ -425,7 +415,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         // hbar = hbar.filter(|l| {
                         //     margin_label
                         //         .as_ref()
-                        //         .map_or(true, |margin| !std::ptr::eq(margin.label, *l))
+                        //         .map_or(true, |margin| !margin.is_referencing(l))
                         //         || !is_src_line
                         // });
 
@@ -445,8 +435,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 draw.hbar.fg(h_label.display_info.color, s),
                             )
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
-                            let is_col =
-                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
+                            let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
                             let is_limit = col == multi_labels_with_message.len();
                             (
                                 if is_limit {
@@ -534,7 +523,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         if is_start
                             && margin_label
                                 .as_ref()
-                                .map_or(true, |m| !std::ptr::eq(*label, m.label))
+                                .map_or(true, |m| !m.is_referencing(label))
                         {
                             // TODO: Check to see whether multi is the first on the start line or first on the end line
                             Some(LineLabel {
@@ -642,7 +631,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                             ll.label.display_info.msg.is_some()
                                 && margin_label
                                     .as_ref()
-                                    .map_or(true, |m| !std::ptr::eq(ll.label, m.label))
+                                    .map_or(true, |m| !m.is_referencing(ll.label))
                         })
                         .find(|(j, ll)| ll.col == col && row <= *j)
                         .map(|(_, ll)| ll)
@@ -811,7 +800,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                             && line_label.label.display_info.msg.is_some()
                             && margin_label
                                 .as_ref()
-                                .map_or(true, |m| !std::ptr::eq(line_label.label, m.label))
+                                .map_or(true, |m| !m.is_referencing(line_label.label))
                         {
                             [
                                 if line_label.multi.is_some() {
@@ -937,6 +926,22 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             }
         }
         Ok(())
+    }
+}
+
+struct LineLabel<'a> {
+    col: usize,
+    label: &'a LabelInfo<'a>,
+    multi: Option<usize>,
+    draw_msg: bool,
+}
+
+impl LineLabel<'_> {
+    fn is_referencing(&self, label: &LabelInfo<'_>) -> bool {
+        // Do they point to the same label?
+        // Note that we want this, and not to compare the labels themselves, so as to support
+        // printing the same label twice if we were given that.
+        std::ptr::eq(self.label, label)
     }
 }
 
@@ -1137,6 +1142,30 @@ mod tests {
          2 | orange;
            | ------
            |    `---- This is an orange
+        ---'
+        "###);
+    }
+    #[test]
+    fn duplicate_label() {
+        let source = "apple == orange;";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[ <unknown>:1:1 ]
+           |
+         1 | apple == orange;
+           | ^^|^^
+           |   `---- This is an apple
+           |   |
+           |   `---- This is an apple
         ---'
         "###);
     }
