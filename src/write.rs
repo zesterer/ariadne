@@ -912,18 +912,14 @@ mod tests {
         }
     }
 
-    fn no_color_and_ascii() -> Config {
-        Config::default()
-            .with_color(false)
-            // Using Ascii so that the inline snapshots display correctly
-            // even with fonts where characters like '┬' take up more space.
-            .with_char_set(CharSet::Ascii)
+    fn no_color() -> Config {
+        Config::default().with_color(false)
     }
 
     #[test]
     fn one_message() {
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .finish()
             .write_to_string(Source::from(""));
@@ -936,7 +932,7 @@ mod tests {
     fn two_labels_without_messages() {
         let source = "apple == orange;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5))
             .with_label(Label::new(9..15))
@@ -945,10 +941,10 @@ mod tests {
         // TODO: it would be nice if these spans still showed up (like codespan-reporting does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == orange;
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+        ───╯
         "###);
     }
 
@@ -956,7 +952,7 @@ mod tests {
     fn two_labels_with_messages() {
         let source = "apple == orange;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -965,14 +961,14 @@ mod tests {
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == orange;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an apple
-           |             |    
-           |             `---- This is an orange
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an apple
+           │             │    
+           │             ╰──── This is an orange
+        ───╯
         "###);
     }
 
@@ -980,7 +976,7 @@ mod tests {
     fn duplicate_label() {
         let source = "apple == orange;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(0..5).with_message("This is an apple"))
@@ -988,14 +984,14 @@ mod tests {
             .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == orange;
-           | ^^|^^  
-           |   `---- This is an apple
-           |   |    
-           |   `---- This is an apple
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──  
+           │   ╰──── This is an apple
+           │   │    
+           │   ╰──── This is an apple
+        ───╯
         "###);
     }
 
@@ -1003,7 +999,7 @@ mod tests {
     fn multi_byte_chars() {
         let source = "äpplë == örängë;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Char))
+            .with_config(no_color().with_index_type(IndexType::Char))
             .with_message("can't compare äpplës with örängës")
             .with_label(Label::new(0..5).with_message("This is an äpplë"))
             .with_label(Label::new(9..15).with_message("This is an örängë"))
@@ -1012,14 +1008,14 @@ mod tests {
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare äpplës with örängës
-           ,-[<unknown>:1:1]
-           |
-         1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an äpplë
-           |             |    
-           |             `---- This is an örängë
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an äpplë
+           │             │    
+           │             ╰──── This is an örängë
+        ───╯
         "###);
     }
 
@@ -1027,7 +1023,7 @@ mod tests {
     fn byte_label() {
         let source = "äpplë == örängë;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+            .with_config(no_color().with_index_type(IndexType::Byte))
             .with_message("can't compare äpplës with örängës")
             .with_label(Label::new(0..7).with_message("This is an äpplë"))
             .with_label(Label::new(11..20).with_message("This is an örängë"))
@@ -1036,14 +1032,14 @@ mod tests {
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare äpplës with örängës
-           ,-[<unknown>:1:1]
-           |
-         1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an äpplë
-           |             |    
-           |             `---- This is an örängë
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an äpplë
+           │             │    
+           │             ╰──── This is an örängë
+        ───╯
         "###);
     }
 
@@ -1051,7 +1047,7 @@ mod tests {
     fn byte_column() {
         let source = "äpplë == örängë;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 11)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+            .with_config(no_color().with_index_type(IndexType::Byte))
             .with_message("can't compare äpplës with örängës")
             .with_label(Label::new(0..7).with_message("This is an äpplë"))
             .with_label(Label::new(11..20).with_message("This is an örängë"))
@@ -1060,14 +1056,14 @@ mod tests {
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare äpplës with örängës
-           ,-[<unknown>:1:10]
-           |
-         1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an äpplë
-           |             |    
-           |             `---- This is an örängë
-        ---'
+           ╭─[<unknown>:1:10]
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an äpplë
+           │             │    
+           │             ╰──── This is an örängë
+        ───╯
         "###);
     }
 
@@ -1075,7 +1071,7 @@ mod tests {
     fn label_at_end_of_long_line() {
         let source = format!("{}orange", "apple == ".repeat(100));
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(
                 Label::new(source.len() - 5..source.len()).with_message("This is an orange"),
@@ -1085,12 +1081,12 @@ mod tests {
         // TODO: it would be nice if the start of long lines would be omitted (like rustc does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
-           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^^|^^  
-           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        `---- This is an orange
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
+           │                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ──┬──  
+           │                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ╰──── This is an orange
+        ───╯
         "###);
     }
 
@@ -1098,7 +1094,7 @@ mod tests {
     fn label_of_width_zero_at_end_of_line() {
         let source = "apple ==\n";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+            .with_config(no_color().with_index_type(IndexType::Byte))
             .with_message("unexpected end of file")
             .with_label(Label::new(9..9).with_message("Unexpected end of file"))
             .finish()
@@ -1106,12 +1102,12 @@ mod tests {
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
-           |
-         1 | apple ==
-           |          | 
-           |          `- Unexpected end of file
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple ==
+           │          │ 
+           │          ╰─ Unexpected end of file
+        ───╯
         "###);
     }
 
@@ -1119,7 +1115,7 @@ mod tests {
     fn empty_input() {
         let source = "";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("unexpected end of file")
             .with_label(Label::new(0..0).with_message("No more fruit!"))
             .finish()
@@ -1127,12 +1123,12 @@ mod tests {
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
-           |
-         1 | 
-           | | 
-           | `- No more fruit!
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ 
+           │ │ 
+           │ ╰─ No more fruit!
+        ───╯
         "###);
     }
 
@@ -1140,7 +1136,7 @@ mod tests {
     fn empty_input_help() {
         let source = "";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("unexpected end of file")
             .with_label(Label::new(0..0).with_message("No more fruit!"))
             .with_help("have you tried going to the farmer's market?")
@@ -1149,14 +1145,14 @@ mod tests {
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
-           |
-         1 | 
-           | | 
-           | `- No more fruit!
-           | 
-           | Help: have you tried going to the farmer's market?
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ 
+           │ │ 
+           │ ╰─ No more fruit!
+           │ 
+           │ Help: have you tried going to the farmer's market?
+        ───╯
         "###);
     }
 
@@ -1164,7 +1160,7 @@ mod tests {
     fn empty_input_note() {
         let source = "";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("unexpected end of file")
             .with_label(Label::new(0..0).with_message("No more fruit!"))
             .with_note("eat your greens!")
@@ -1173,14 +1169,14 @@ mod tests {
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
-           |
-         1 | 
-           | | 
-           | `- No more fruit!
-           | 
-           | Note: eat your greens!
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ 
+           │ │ 
+           │ ╰─ No more fruit!
+           │ 
+           │ Note: eat your greens!
+        ───╯
         "###);
     }
 
@@ -1188,7 +1184,7 @@ mod tests {
     fn empty_input_help_note() {
         let source = "";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("unexpected end of file")
             .with_label(Label::new(0..0).with_message("No more fruit!"))
             .with_note("eat your greens!")
@@ -1198,16 +1194,16 @@ mod tests {
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
-           |
-         1 | 
-           | | 
-           | `- No more fruit!
-           | 
-           | Help: have you tried going to the farmer's market?
-           | 
-           | Note: eat your greens!
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ 
+           │ │ 
+           │ ╰─ No more fruit!
+           │ 
+           │ Help: have you tried going to the farmer's market?
+           │ 
+           │ Note: eat your greens!
+        ───╯
         "###);
     }
 
@@ -1218,7 +1214,7 @@ mod tests {
         for i in 0..=source.len() {
             for j in i..=source.len() {
                 let _ = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-                    .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                    .with_config(no_color().with_index_type(IndexType::Byte))
                     .with_message("Label")
                     .with_label(Label::new(i..j).with_message("Label"))
                     .finish()
@@ -1231,21 +1227,21 @@ mod tests {
     fn multiline_label() {
         let source = "apple\n==\norange";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
             .finish()
             .write_to_string(Source::from(source));
         // TODO: it would be nice if the 2nd line wasn't omitted
         assert_snapshot!(msg, @r###"
         Error: 
-           ,-[<unknown>:1:1]
-           |
-         1 | ,-> apple
-           : :   
-         3 | |-> orange
-           | |           
-           | `----------- illegal comparison
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ ╭─▶ apple
+           ┆ ┆   
+         3 │ ├─▶ orange
+           │ │           
+           │ ╰─────────── illegal comparison
+        ───╯
         "###);
     }
 
@@ -1253,7 +1249,7 @@ mod tests {
     fn partially_overlapping_labels() {
         let source = "https://example.com/";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_label(Label::new(0..source.len()).with_message("URL"))
             .with_label(Label::new(0..source.find(':').unwrap()).with_message("scheme"))
             .finish()
@@ -1261,14 +1257,14 @@ mod tests {
         // TODO: it would be nice if you could tell where the spans start and end.
         assert_snapshot!(msg, @r###"
         Error: 
-           ,-[<unknown>:1:1]
-           |
-         1 | https://example.com/
-           | ^^|^^^^^^^|^^^^^^^^^  
-           |   `------------------- scheme
-           |           |           
-           |           `----------- URL
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ https://example.com/
+           │ ──┬───────┬─────────  
+           │   ╰─────────────────── scheme
+           │           │           
+           │           ╰─────────── URL
+        ───╯
         "###);
     }
 
@@ -1276,7 +1272,7 @@ mod tests {
     fn multiple_labels_same_span() {
         let source = "apple == orange;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(0..5).with_message("Have I mentioned that this is an apple?"))
@@ -1288,22 +1284,22 @@ mod tests {
             .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == orange;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an apple
-           |   |         |    
-           |   `-------------- Have I mentioned that this is an apple?
-           |   |         |    
-           |   `-------------- No really, have I mentioned that?
-           |             |    
-           |             `---- This is an orange
-           |             |    
-           |             `---- Have I mentioned that this is an orange?
-           |             |    
-           |             `---- No really, have I mentioned that?
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an apple
+           │   │         │    
+           │   ╰────────────── Have I mentioned that this is an apple?
+           │   │         │    
+           │   ╰────────────── No really, have I mentioned that?
+           │             │    
+           │             ╰──── This is an orange
+           │             │    
+           │             ╰──── Have I mentioned that this is an orange?
+           │             │    
+           │             ╰──── No really, have I mentioned that?
+        ───╯
         "###)
     }
 
@@ -1311,7 +1307,7 @@ mod tests {
     fn note() {
         let source = "apple == orange;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -1320,16 +1316,16 @@ mod tests {
             .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == orange;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an apple
-           |             |    
-           |             `---- This is an orange
-           | 
-           | Note: stop trying ... this is a fruitless endeavor
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an apple
+           │             │    
+           │             ╰──── This is an orange
+           │ 
+           │ Note: stop trying ... this is a fruitless endeavor
+        ───╯
         "###)
     }
 
@@ -1337,7 +1333,7 @@ mod tests {
     fn help() {
         let source = "apple == orange;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -1346,16 +1342,16 @@ mod tests {
             .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == orange;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an apple
-           |             |    
-           |             `---- This is an orange
-           | 
-           | Help: have you tried peeling the orange?
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an apple
+           │             │    
+           │             ╰──── This is an orange
+           │ 
+           │ Help: have you tried peeling the orange?
+        ───╯
         "###)
     }
 
@@ -1363,7 +1359,7 @@ mod tests {
     fn help_and_note() {
         let source = "apple == orange;";
         let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
-            .with_config(no_color_and_ascii())
+            .with_config(no_color())
             .with_message("can't compare apples with oranges")
             .with_label(Label::new(0..5).with_message("This is an apple"))
             .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -1373,18 +1369,18 @@ mod tests {
             .write_to_string(Source::from(source));
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
-           |
-         1 | apple == orange;
-           | ^^|^^    ^^^|^^  
-           |   `-------------- This is an apple
-           |             |    
-           |             `---- This is an orange
-           | 
-           | Help: have you tried peeling the orange?
-           | 
-           | Note: stop trying ... this is a fruitless endeavor
-        ---'
+           ╭─[<unknown>:1:1]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──  
+           │   ╰────────────── This is an apple
+           │             │    
+           │             ╰──── This is an orange
+           │ 
+           │ Help: have you tried peeling the orange?
+           │ 
+           │ Note: stop trying ... this is a fruitless endeavor
+        ───╯
         "###)
     }
 }
