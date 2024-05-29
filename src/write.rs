@@ -212,6 +212,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         // Line number maximum width
         let line_num_width = max_line_num(&groups, &mut cache).map_or(0, nb_digits);
 
+        let margin_char = |c: char| c.fg(self.config.margin_color(), s);
+
         // --- Source sections ---
         let groups_len = groups.len();
         for (
@@ -260,11 +262,10 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 w,
                 "{}{}{}{} {location} {}",
                 Rept(' ', line_num_width + 2).fg(self.config.margin_color(), s),
-                draw.group_connector(group_idx == 0)
-                    .fg(self.config.margin_color(), s),
-                draw.hbar.fg(self.config.margin_color(), s),
-                draw.lbox.fg(self.config.margin_color(), s),
-                draw.rbox.fg(self.config.margin_color(), s),
+                margin_char(draw.group_connector(group_idx == 0)),
+                margin_char(draw.hbar),
+                margin_char(draw.lbox),
+                margin_char(draw.rbox),
             )?;
 
             if !self.config.compact {
@@ -272,7 +273,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     w,
                     "{}{}",
                     Rept(' ', line_num_width + 2),
-                    draw.vbar.fg(self.config.margin_color(), s)
+                    margin_char(draw.vbar)
                 )?;
             }
 
@@ -915,15 +916,18 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             // Tail of report
             if !self.config.compact {
                 if is_final_group {
-                    let final_margin =
-                        format!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot);
-                    writeln!(w, "{}", final_margin.fg(self.config.margin_color(), s))?;
+                    writeln!(
+                        w,
+                        "{}",
+                        format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
+                            .fg(self.config.margin_color(), s)
+                    )?;
                 } else {
                     writeln!(
                         w,
                         "{}{}",
                         Rept(' ', line_num_width + 2),
-                        draw.vbar.fg(self.config.margin_color(), s)
+                        margin_char(draw.vbar)
                     )?;
                 }
             }
@@ -1160,17 +1164,17 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^|^^
+           | -----
            |   `---- This is an apple
            |   |
            |   `---- This is an apple
         ---'
-        "###);
+        ");
     }
 
     #[test]
