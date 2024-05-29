@@ -551,7 +551,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
                     })
                     .chain(
-                         labels.iter()
+                        labels
+                            .iter()
                             .filter(|label_info| {
                                 matches!(label_info.kind, LabelKind::Inline)
                                     && label_info.char_span.start >= line.span().start
@@ -858,7 +859,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             if is_final_group {
                 for (i, help) in self.help.iter().enumerate() {
                     if !self.config.compact {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                         writeln!(w)?;
                     }
                     let help_prefix = format!("{} {}", "Help", i + 1);
@@ -869,7 +870,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     };
                     let mut lines = help.lines();
                     if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                         if self.help.len() > 1 {
                             writeln!(w, "{}: {line}", help_prefix.fg(self.config.note_color(), s))?;
                         } else {
@@ -877,7 +878,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
                     }
                     for line in lines {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                         writeln!(w, "{:>pad$}{line}", "", pad = help_prefix_len + 2)?;
                     }
                 }
@@ -887,7 +888,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             if is_final_group {
                 for (i, note) in self.notes.iter().enumerate() {
                     if !self.config.compact {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                         writeln!(w)?;
                     }
                     let note_prefix = format!("{} {}", "Note", i + 1);
@@ -898,7 +899,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     };
                     let mut lines = note.lines();
                     if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                         if self.notes.len() > 1 {
                             writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
                         } else {
@@ -1253,7 +1254,7 @@ mod tests {
     #[test]
     fn crossing_lines() {
         let source = "äpplë == örängë;";
-        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 11)
+        let msg = Report::build(ReportKind::Error, 11..11)
             .with_config(no_color().with_cross_gap(false))
             .with_message("can't compare äpplës with örängës")
             .with_label(Label::new(0..5).with_message("This is an äpplë"))
@@ -1261,9 +1262,9 @@ mod tests {
             .finish()
             .write_to_string(Source::from(source));
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare äpplës with örängës
-           ╭─[<unknown>:1:12]
+           ╭─[ <unknown>:1:12 ]
            │
          1 │ äpplë == örängë;
            │ ──┬──    ───┬──  
@@ -1271,7 +1272,7 @@ mod tests {
            │             │    
            │             ╰──── This is an örängë
         ───╯
-        "###);
+        ");
     }
 
     #[test]
@@ -1471,7 +1472,7 @@ mod tests {
     #[test]
     fn multiple_multilines_same_span() {
         let source = "apple\n==\norange";
-        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::build(ReportKind::Error, 0..0)
             .with_config(no_color())
             .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
             .with_label(Label::new(0..source.len()).with_message("do not do this"))
@@ -1480,9 +1481,9 @@ mod tests {
             .write_to_string(Source::from(source));
         // TODO: it would be nice if the 2nd line wasn't omitted
         // TODO: it would be nice if the lines didn't cross, or at least less so
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: 
-           ╭─[<unknown>:1:1]
+           ╭─[ <unknown>:1:1 ]
            │
          1 │ ╭─────▶ apple
            │ │       ▲       
@@ -1490,15 +1491,15 @@ mod tests {
            │ │ │     │       
            │ │ │ ╭───╯       
            ┆ ┆ ┆ ┆   
-         3 │ ├─│ │ ▶ orange
+         3 │ ├─│─│─▶ orange
            │ │ │ │        ▲  
-           │ ╰─────────────── illegal comparison
+           │ ╰─│─│────────│── illegal comparison
            │   │ │        │  
-           │   ╰──────────┴── do not do this
+           │   ╰─│────────┴── do not do this
            │     │        │  
            │     ╰────────┴── please reconsider
         ───╯
-        "###);
+        ");
     }
 
     #[test]
