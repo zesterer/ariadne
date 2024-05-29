@@ -221,6 +221,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         ) in groups.into_iter().enumerate()
         {
             let Some((src, src_name)) = fetch_source(&mut cache, src_id) else {
+                // `fetch_source` should have reported the error.
                 continue;
             };
 
@@ -272,19 +273,20 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             }
 
             // Generate a list of multi-line labels
-            let mut multi_labels = Vec::new();
-            let mut multi_labels_with_message = Vec::new();
-            for label_info in &labels {
-                if matches!(label_info.kind, LabelKind::Multiline) {
-                    multi_labels.push(label_info);
-                    if label_info.display_info.msg.is_some() {
-                        multi_labels_with_message.push(label_info);
-                    }
-                }
-            }
+            let mut multi_labels: Vec<_> = labels
+                .iter()
+                .filter(|label_info| matches!(label_info.kind, LabelKind::Multiline))
+                .collect();
+            // Sort them by length; this also ensures that the next array is sorted.
+            multi_labels.sort_unstable_by_key(|label_info| !Span::len(&label_info.char_span));
 
-            // Sort multiline labels by length
-            multi_labels.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
+            let mut multi_labels_with_message: Vec<_> = multi_labels
+                .iter()
+                .copied()
+                .filter(|label_info| label_info.display_info.msg.is_some())
+                .collect();
+            // Since we're filtering a sorted array, this one is also sorted.
+            // However, we may want to re-sort it:
             if self.config.minimise_crossings {
                 // There is no total ordering to labels, so just spin around a bunch rearranging labels making tiny improvements
                 // Crap bubble sort, basically
@@ -302,8 +304,6 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         multi_labels_with_message.swap(i, i + 1);
                     }
                 }
-            } else {
-                multi_labels_with_message.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
             }
 
             let write_margin = |w: &mut WrappedWriter<W>,
