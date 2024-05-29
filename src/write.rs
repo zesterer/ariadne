@@ -780,20 +780,20 @@ impl<S: Span> Report<'_, S> {
             let is_final_group = group_idx + 1 == groups_len;
 
             // Help
-            if let (Some(note), true) = (&self.help, is_final_group) {
+            if let (Some(help), true) = (&self.help, is_final_group) {
                 if !self.config.compact {
-                    write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                    write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                     writeln!(w)?;
                 }
-                write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                writeln!(w, "{}: {note}", "Help".fg(self.config.note_color(), s))?;
+                write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
+                writeln!(w, "{}: {help}", "Help".fg(self.config.note_color(), s))?;
             }
 
             // Note
             if is_final_group {
                 for (i, note) in self.notes.iter().enumerate() {
                     if !self.config.compact {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                         writeln!(w)?;
                     }
                     let note_prefix = format!("{} {}", "Note", i + 1);
@@ -804,7 +804,7 @@ impl<S: Span> Report<'_, S> {
                     };
                     let mut lines = note.lines();
                     if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
                         if self.notes.len() > 1 {
                             writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
                         } else {
@@ -1115,7 +1115,7 @@ mod tests {
     #[test]
     fn crossing_lines() {
         let source = "äpplë == örängë;";
-        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 11)
+        let msg = Report::build(ReportKind::Error, 11..11)
             .with_config(no_color().with_cross_gap(false))
             .with_message("can't compare äpplës with örängës")
             .with_label(Label::new(0..5).with_message("This is an äpplë"))
@@ -1123,9 +1123,9 @@ mod tests {
             .finish()
             .write_to_string(Source::from(source));
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare äpplës with örängës
-           ╭─[<unknown>:1:12]
+           ╭─[ <unknown>:1:12 ]
            │
          1 │ äpplë == örängë;
            │ ──┬──    ───┬──  
@@ -1133,7 +1133,7 @@ mod tests {
            │             │    
            │             ╰──── This is an örängë
         ───╯
-        "###);
+        ");
     }
 
     #[test]
@@ -1333,7 +1333,7 @@ mod tests {
     #[test]
     fn multiple_multilines_same_span() {
         let source = "apple\n==\norange";
-        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+        let msg = Report::build(ReportKind::Error, 0..0)
             .with_config(no_color())
             .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
             .with_label(Label::new(0..source.len()).with_message("do not do this"))
@@ -1342,9 +1342,9 @@ mod tests {
             .write_to_string(Source::from(source));
         // TODO: it would be nice if the 2nd line wasn't omitted
         // TODO: it would be nice if the lines didn't cross, or at least less so
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: 
-           ╭─[<unknown>:1:1]
+           ╭─[ <unknown>:1:1 ]
            │
          1 │ ╭─────▶ apple
            │ │       ▲       
@@ -1360,7 +1360,7 @@ mod tests {
            │     │        │  
            │     ╰────────┴── please reconsider
         ───╯
-        "###);
+        ");
     }
 
     #[test]
