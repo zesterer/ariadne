@@ -421,58 +421,56 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
                         let (a, b) = if let Some((label, is_start)) = corner {
                             (
-                                if is_start { draw.ltop } else { draw.lbot }
-                                    .fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
+                                Some((if is_start { draw.ltop } else { draw.lbot }, *label)),
+                                Some((draw.hbar, *label)),
                             )
                         } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
                             (
                                 if self.config.cross_gap {
-                                    draw.vbar.fg(v_label.display_info.color, s)
+                                    Some((draw.vbar, v_label))
                                 } else {
-                                    draw.xbar.fg(v_label.display_info.color, s)
+                                    Some((draw.xbar, v_label))
                                 },
-                                draw.hbar.fg(h_label.display_info.color, s),
+                                Some((draw.hbar, h_label)),
                             )
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
                             let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
                             let is_limit = col == multi_labels_with_message.len();
                             (
-                                if is_limit {
-                                    if self.config.multiline_arrows {
-                                        draw.rarrow
+                                Some((
+                                    if is_limit {
+                                        if self.config.multiline_arrows {
+                                            draw.rarrow
+                                        } else {
+                                            draw.hbar
+                                        }
+                                    } else if is_col {
+                                        if is_start {
+                                            draw.ltop
+                                        } else {
+                                            draw.lcross
+                                        }
                                     } else {
                                         draw.hbar
-                                    }
-                                } else if is_col {
-                                    if is_start {
-                                        draw.ltop
-                                    } else {
-                                        draw.lcross
-                                    }
-                                } else {
-                                    draw.hbar
-                                }
-                                .fg(margin.label.display_info.color, s),
-                                if !is_limit { draw.hbar } else { ' ' }
-                                    .fg(margin.label.display_info.color, s),
+                                    },
+                                    margin.label,
+                                )),
+                                Some((if !is_limit { draw.hbar } else { ' ' }, margin.label)),
                             )
                         } else if let Some(label) = hbar {
-                            (
-                                draw.hbar.fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
-                            )
+                            (Some((draw.hbar, label)), Some((draw.hbar, label)))
                         } else if let Some(label) = vbar {
-                            (
-                                draw.vbar(is_ellipsis).fg(label.display_info.color, s),
-                                ' '.fg(None, s),
-                            )
+                            (Some((draw.vbar(is_ellipsis), label)), None)
                         } else {
-                            (' '.fg(None, s), ' '.fg(None, s))
+                            (None, None)
                         };
-                        write!(w, "{a}")?;
+                        let arrow_char = |opt: Option<(char, &LabelInfo<'_>)>| match opt {
+                            Some((c, label)) => c.fg(label.display_info.color, s),
+                            None => ' '.fg(None, s),
+                        };
+                        write!(w, "{}", arrow_char(a))?;
                         if !self.config.compact {
-                            write!(w, "{b}")?;
+                            write!(w, "{}", arrow_char(b))?;
                         }
                     }
                 }
