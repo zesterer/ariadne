@@ -452,6 +452,11 @@ impl<S: Span> Report<'_, S> {
                         }
                     })
                     .min_by_key(|ll| (ll.col, !ll.label.char_span.start));
+                let is_margin_label = |label| {
+                    margin_label
+                        .as_ref()
+                        .map_or(false, |m_label| m_label.is_referencing(label))
+                };
 
                 // Generate a list of labels for this line, along with their label columns
                 let mut line_labels = multi_labels_with_message
@@ -459,11 +464,7 @@ impl<S: Span> Report<'_, S> {
                     .filter_map(|label| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
-                        if is_start
-                            && margin_label
-                                .as_ref()
-                                .map_or(true, |m| !m.is_referencing(label))
-                        {
+                        if is_start && !is_margin_label(label) {
                             // TODO: Check to see whether multi is the first on the start line or first on the end line
                             Some(LineLabel {
                                 col: label.char_span.start - line.offset(),
@@ -553,10 +554,7 @@ impl<S: Span> Report<'_, S> {
                         // Only labels with notes get an arrow
                         .enumerate()
                         .filter(|(_, ll)| {
-                            ll.label.display_info.msg.is_some()
-                                && margin_label
-                                    .as_ref()
-                                    .map_or(true, |m| !m.is_referencing(ll.label))
+                            ll.label.display_info.msg.is_some() && !is_margin_label(ll.label)
                         })
                         .find(|(j, ll)| ll.col == col && row <= *j)
                         .map(|(_, ll)| ll)
@@ -723,9 +721,7 @@ impl<S: Span> Report<'_, S> {
                             && line_label.label.display_info.msg.is_some();
                         let [c, tail] = if col == line_label.col
                             && line_label.label.display_info.msg.is_some()
-                            && margin_label
-                                .as_ref()
-                                .map_or(true, |m| !m.is_referencing(line_label.label))
+                            && !is_margin_label(line_label.label)
                         {
                             [
                                 if line_label.multi {
