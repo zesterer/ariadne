@@ -1252,6 +1252,30 @@ mod tests {
     }
 
     #[test]
+    fn crossing_lines() {
+        let source = "äpplë == örängë;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 11)
+            .with_config(no_color().with_cross_gap(false))
+            .with_message("can't compare äpplës with örängës")
+            .with_label(Label::new(0..5).with_message("This is an äpplë"))
+            .with_label(Label::new(9..15).with_message("This is an örängë"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if these lines didn't cross
+        assert_snapshot!(msg, @r###"
+        Error: can't compare äpplës with örängës
+           ╭─[<unknown>:1:12]
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──  
+           │   ╰─────────┼──── This is an äpplë
+           │             │    
+           │             ╰──── This is an örängë
+        ───╯
+        "###);
+    }
+
+    #[test]
     fn label_at_end_of_long_line() {
         let source = format!("{}orange", "apple == ".repeat(100));
         let msg = remove_trailing(
@@ -1443,6 +1467,39 @@ mod tests {
            │ ╰─────────── illegal comparison
         ───╯
         ");
+    }
+
+    #[test]
+    fn multiple_multilines_same_span() {
+        let source = "apple\n==\norange";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color())
+            .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
+            .with_label(Label::new(0..source.len()).with_message("do not do this"))
+            .with_label(Label::new(0..source.len()).with_message("please reconsider"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if the 2nd line wasn't omitted
+        // TODO: it would be nice if the lines didn't cross, or at least less so
+        assert_snapshot!(msg, @r###"
+        Error: 
+           ╭─[<unknown>:1:1]
+           │
+         1 │ ╭─────▶ apple
+           │ │       ▲       
+           │ │ ╭─────╯       
+           │ │ │     │       
+           │ │ │ ╭───╯       
+           ┆ ┆ ┆ ┆   
+         3 │ ├─│ │ ▶ orange
+           │ │ │ │        ▲  
+           │ ╰─────────────── illegal comparison
+           │   │ │        │  
+           │   ╰──────────┴── do not do this
+           │     │        │  
+           │     ╰────────┴── please reconsider
+        ───╯
+        "###);
     }
 
     #[test]
