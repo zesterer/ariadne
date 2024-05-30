@@ -1015,7 +1015,7 @@ mod tests {
     use insta::assert_snapshot;
 
     use crate::{
-        Cache, CharSet, Config, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
+        Cache, Config, FnCache, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
     };
 
     impl<S: Span, K: ReportStyle> Report<S, K> {
@@ -1032,6 +1032,12 @@ mod tests {
 
     fn remove_trailing(s: String) -> String {
         s.lines().flat_map(|l| [l.trim_end(), "\n"]).collect()
+    }
+
+    fn multi_sources<'srcs, const NB_SOURCES: usize>(
+        sources: &'srcs [&'static str; NB_SOURCES],
+    ) -> impl Cache<usize> + 'srcs {
+        FnCache::new(move |id: &_| Ok(sources[*id]))
     }
 
     #[test]
@@ -1861,6 +1867,80 @@ mod tests {
            │ │     ╰── single
            │ │
            │ ╰──────── multi 1
+        ───╯
+        ")
+    }
+
+    #[test]
+    fn multi_source() {
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, (0, 0..0))
+                .with_config(no_color())
+                .with_message("can't compare apples with oranges or pears")
+                .with_label(Label::new((0, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((0, 9..15)).with_message("This is an orange"))
+                .with_label(Label::new((1, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((1, 9..13)).with_message("This is a pear"))
+                .finish()
+                .write_to_string(multi_sources(&["apple == orange;", "apple == pear;"])),
+        );
+        assert_snapshot!(msg, @r"
+        Error: can't compare apples with oranges or pears
+           ╭─[ 0:1:1 ]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰────────────── This is an apple
+           │             │
+           │             ╰──── This is an orange
+           │
+           ├─[ 1:1:1 ]
+           │
+         1 │ apple == pear;
+           │ ──┬──    ──┬─
+           │   ╰──────────── This is an apple
+           │            │
+           │            ╰─── This is a pear
+        ───╯
+        ")
+    }
+
+    #[test]
+    fn help_and_note_multi() {
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, (0, 0..0))
+                .with_config(no_color())
+                .with_message("can't compare apples with oranges or pears")
+                .with_label(Label::new((0, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((0, 9..15)).with_message("This is an orange"))
+                .with_label(Label::new((1, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((1, 9..13)).with_message("This is a pear"))
+                .with_help("have you tried peeling the orange?")
+                .with_note("stop trying ... this is a fruitless endeavor")
+                .finish()
+                .write_to_string(multi_sources(&["apple == orange;", "apple == pear;"])),
+        );
+        assert_snapshot!(msg, @r"
+        Error: can't compare apples with oranges or pears
+           ╭─[ 0:1:1 ]
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰────────────── This is an apple
+           │             │
+           │             ╰──── This is an orange
+           │
+           ├─[ 1:1:1 ]
+           │
+         1 │ apple == pear;
+           │ ──┬──    ──┬─
+           │   ╰──────────── This is an apple
+           │            │
+           │            ╰─── This is a pear
+           │
+           │ Help: have you tried peeling the orange?
+           │
+           │ Note: stop trying ... this is a fruitless endeavor
         ───╯
         ")
     }
