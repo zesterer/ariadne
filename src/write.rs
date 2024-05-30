@@ -220,8 +220,7 @@ impl<S: Span> Report<'_, S> {
         };
 
         // --- Source sections ---
-        let groups_len = groups.len();
-        for (group_idx, group) in groups.into_iter().enumerate() {
+        for (group_idx, group) in groups.iter().enumerate() {
             let Some((src, src_name)) = fetch_source(&mut cache, group.src_id) else {
                 // `fetch_source` should have reported the error.
                 continue;
@@ -828,7 +827,7 @@ impl<S: Span> Report<'_, S> {
         // Tail of report.
         // Not to be emitted in compact mode, or if nothing has had the margin printed.
         if !self.config.compact
-            && !(groups_len == 0 && self.help.is_none() && self.notes.is_empty())
+            && !(groups.is_empty() && self.help.is_none() && self.notes.is_empty())
         {
             writeln!(
                 w,
