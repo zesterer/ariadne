@@ -214,7 +214,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
         let margin_char = |c: char| c.fg(self.config.margin_color(), s);
 
-        let write_margin = |w: &mut W, idx, is_src_line, is_ellipsis: bool| {
+        let write_margin = |w: &mut WrappedWriter<W>, idx, is_src_line, is_ellipsis: bool| {
             let line_num_margin = if is_src_line && !is_ellipsis {
                 format!("{:line_num_width$} {}", idx + 1, draw.vbar)
                     .fg(self.config.margin_color(), s)
@@ -233,7 +233,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 Show((!self.config.compact).then_some(' ')),
             )
         };
-        let write_spacer_line = |w: &mut W| {
+        let write_spacer_line = |w: &mut WrappedWriter<W>| {
             if !self.config.compact {
                 writeln!(
                     w,
@@ -290,11 +290,17 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     }),
                 },
             );
+            let corner_char = if group_idx == 0 {
+                draw.ltop
+            } else {
+                write_spacer_line(&mut w)?;
+                draw.lcross
+            };
             writeln!(
                 w,
                 "{}{}{}{} {location} {}",
                 Rept(' ', line_num_width + 2).fg(self.config.margin_color(), s),
-                margin_char(draw.group_connector(group_idx == 0)),
+                margin_char(corner_char),
                 margin_char(draw.hbar),
                 margin_char(draw.lbox),
                 margin_char(draw.rbox),
@@ -854,81 +860,75 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     writeln!(w)?;
                 }
             }
+        }
 
-            let is_final_group = group_idx + 1 == groups_len;
-
-            // Help
-            if is_final_group {
-                for (i, help) in self.help.iter().enumerate() {
-                    if !self.config.compact {
-                        write_margin(&mut w, 0, false, false)?;
-                        writeln!(w)?;
-                    }
-                    let help_prefix = format!("{} {}", "Help", i + 1);
-                    let help_prefix_len = if self.help.len() > 1 {
-                        help_prefix.len()
-                    } else {
-                        4
-                    };
-                    let mut lines = help.lines();
-                    if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false)?;
-                        if self.help.len() > 1 {
-                            writeln!(w, "{}: {line}", help_prefix.fg(self.config.note_color(), s))?;
-                        } else {
-                            writeln!(w, "{}: {line}", "Help".fg(self.config.note_color(), s))?;
-                        }
-                    }
-                    for line in lines {
-                        write_margin(&mut w, 0, false, false)?;
-                        writeln!(w, "{:>pad$}{line}", "", pad = help_prefix_len + 2)?;
-                    }
-                }
-            }
-
-            // Note
-            if is_final_group {
-                for (i, note) in self.notes.iter().enumerate() {
-                    if !self.config.compact {
-                        write_margin(&mut w, 0, false, false)?;
-                        writeln!(w)?;
-                    }
-                    let note_prefix = format!("{} {}", "Note", i + 1);
-                    let note_prefix_len = if self.notes.len() > 1 {
-                        note_prefix.len()
-                    } else {
-                        4
-                    };
-                    let mut lines = note.lines();
-                    if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false)?;
-                        if self.notes.len() > 1 {
-                            writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
-                        } else {
-                            writeln!(w, "{}: {line}", "Note".fg(self.config.note_color(), s))?;
-                        }
-                    }
-                    for line in lines {
-                        write_margin(&mut w, 0, false, false)?;
-                        writeln!(w, "{:>pad$}{line}", "", pad = note_prefix_len + 2)?;
-                    }
-                }
-            }
-
-            // Tail of report
+        // Help
+        for (i, help) in self.help.iter().enumerate() {
             if !self.config.compact {
-                if is_final_group {
-                    writeln!(
-                        w,
-                        "{}",
-                        format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
-                            .fg(self.config.margin_color(), s)
-                    )?;
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w)?;
+            }
+            let help_prefix = format!("{} {}", "Help", i + 1);
+            let help_prefix_len = if self.help.len() > 1 {
+                help_prefix.len()
+            } else {
+                4
+            };
+            let mut lines = help.lines();
+            if let Some(line) = lines.next() {
+                write_margin(&mut w, 0, false, false)?;
+                if self.help.len() > 1 {
+                    writeln!(w, "{}: {line}", help_prefix.fg(self.config.note_color(), s))?;
                 } else {
-                    write_spacer_line(&mut w)?;
+                    writeln!(w, "{}: {line}", "Help".fg(self.config.note_color(), s))?;
                 }
+            }
+            for line in lines {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w, "{:>pad$}{line}", "", pad = help_prefix_len + 2)?;
             }
         }
+
+        // Notes
+        for (i, note) in self.notes.iter().enumerate() {
+            if !self.config.compact {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w)?;
+            }
+            let note_prefix = format!("{} {}", "Note", i + 1);
+            let note_prefix_len = if self.notes.len() > 1 {
+                note_prefix.len()
+            } else {
+                4
+            };
+            let mut lines = note.lines();
+            if let Some(line) = lines.next() {
+                write_margin(&mut w, 0, false, false)?;
+                if self.notes.len() > 1 {
+                    writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
+                } else {
+                    writeln!(w, "{}: {line}", "Note".fg(self.config.note_color(), s))?;
+                }
+            }
+            for line in lines {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w, "{:>pad$}{line}", "", pad = note_prefix_len + 2)?;
+            }
+        }
+
+        // Tail of report.
+        // Not to be emitted in compact mode, or if nothing has had the margin printed.
+        if !self.config.compact
+            && !(groups_len == 0 && self.help.is_empty() && self.notes.is_empty())
+        {
+            writeln!(
+                w,
+                "{}",
+                format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
+                    .fg(self.config.margin_color(), s)
+            )?;
+        }
+
         Ok(())
     }
 }
@@ -1267,7 +1267,7 @@ mod tests {
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @"
         Error: can't compare äpplës with örängës
-           ╭─[ <unknown>:1:12 ]
+           ╭─┤ <unknown>:1:12 │
            │
          1 │ äpplë == örängë;
            │ ──┬──    ───┬──  
@@ -1486,16 +1486,16 @@ mod tests {
         // TODO: it would be nice if the lines didn't cross, or at least less so
         assert_snapshot!(msg, @"
         Error: 
-           ╭─[ <unknown>:1:1 ]
+           ╭─┤ <unknown>:1:1 │
            │
          1 │ ╭─────▶ apple
-           │ │       ▲       
+           │ │       🭯       
            │ │ ╭─────╯       
            │ │ │     │       
            │ │ │ ╭───╯       
            ┆ ┆ ┆ ┆   
          3 │ ├─│─│─▶ orange
-           │ │ │ │        ▲  
+           │ │ │ │        🭯  
            │ ╰─│─│────────│── illegal comparison
            │   │ │        │  
            │   ╰─│────────┴── do not do this
@@ -1888,7 +1888,7 @@ mod tests {
         );
         assert_snapshot!(msg, @"
         Error: can't compare apples with oranges or pears
-           ╭─[ 0:1:1 ]
+           ╭─┤ 0:1:1 │
            │
          1 │ apple == orange;
            │ ──┬──    ───┬──
@@ -1896,7 +1896,7 @@ mod tests {
            │             │
            │             ╰──── This is an orange
            │
-           ├─[ 1:1:1 ]
+           ├─┤ 1:1:1 │
            │
          1 │ apple == pear;
            │ ──┬──    ──┬─
@@ -1924,7 +1924,7 @@ mod tests {
         );
         assert_snapshot!(msg, @"
         Error: can't compare apples with oranges or pears
-           ╭─[ 0:1:1 ]
+           ╭─┤ 0:1:1 │
            │
          1 │ apple == orange;
            │ ──┬──    ───┬──
@@ -1932,7 +1932,7 @@ mod tests {
            │             │
            │             ╰──── This is an orange
            │
-           ├─[ 1:1:1 ]
+           ├─┤ 1:1:1 │
            │
          1 │ apple == pear;
            │ ──┬──    ──┬─

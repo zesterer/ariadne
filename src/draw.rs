@@ -102,14 +102,6 @@ impl Characters {
             self.vbar
         }
     }
-
-    pub(crate) fn group_connector(&self, is_first_group: bool) -> char {
-        if is_first_group {
-            self.ltop
-        } else {
-            self.lcross
-        }
-    }
 }
 
 /// Output stream to check for whether color is enabled.
