@@ -1873,6 +1873,28 @@ mod tests {
     }
 
     #[test]
+    fn only_help_and_note() {
+        let source = "this should not be printed";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color())
+                .with_message("Programming language \"Rest\" not found")
+                .with_help("a language with a similar name exists: Rust")
+                .with_note("perhaps you'd like some sleep?")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r###"
+        Error: Programming language "Rest" not found
+          │
+          │ Help: a language with a similar name exists: Rust
+          │
+          │ Note: perhaps you'd like some sleep?
+        ──╯
+        "###)
+    }
+
+    #[test]
     fn multi_source() {
         let msg = remove_trailing(
             Report::build(ReportKind::Error, (0, 0..0))
