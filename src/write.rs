@@ -917,8 +917,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
         // Tail of report.
         // Not to be emitted in compact mode, or if nothing has had the margin printed.
-        if !self.config.compact
-            && !(groups.is_empty() && self.help.is_empty() && self.notes.is_empty())
+        if !(self.config.compact
+            || groups.is_empty() && self.help.is_empty() && self.notes.is_empty())
         {
             writeln!(
                 w,
