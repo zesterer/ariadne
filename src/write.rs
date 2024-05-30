@@ -252,11 +252,17 @@ impl<S: Span> Report<'_, S> {
                     }
                 }),
             });
+            let corner_char = if group_idx == 0 {
+                draw.ltop
+            } else {
+                write_spacer_line(&mut w)?;
+                draw.lcross
+            };
             writeln!(
                 w,
                 "{}{}{}{}{src_name}{line_and_col}{}",
                 Rept(' ', line_num_width + 2),
-                margin_char(draw.group_connector(group_idx == 0)),
+                margin_char(corner_char),
                 margin_char(draw.hbar),
                 margin_char(draw.lbox),
                 margin_char(draw.rbox),
@@ -777,43 +783,40 @@ impl<S: Span> Report<'_, S> {
                     writeln!(w)?;
                 }
             }
-
-            let is_final_group = group_idx + 1 == groups_len;
-
-            // Help
-            if let (Some(help), true) = (&self.help, is_final_group) {
-                if !self.config.compact {
-                    write_margin(&mut w, 0, false, false)?;
-                    writeln!(w)?;
-                }
-                write_margin(&mut w, 0, false, false)?;
-                writeln!(w, "{}: {help}", "Help".fg(self.config.note_color(), s))?;
-            }
-
-            // Note
-            if let (Some(note), true) = (&self.note, is_final_group) {
-                if !self.config.compact {
-                    write_margin(&mut w, 0, false, false)?;
-                    writeln!(w)?;
-                }
-                write_margin(&mut w, 0, false, false)?;
-                writeln!(w, "{}: {note}", "Note".fg(self.config.note_color(), s))?;
-            }
-
-            // Tail of report
-            if !self.config.compact {
-                if is_final_group {
-                    writeln!(
-                        w,
-                        "{}",
-                        format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
-                            .fg(self.config.margin_color(), s)
-                    )?;
-                } else {
-                    write_spacer_line(&mut w)?;
-                }
-            }
         }
+
+        // Help
+        if let Some(help) = &self.help {
+            if !self.config.compact {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w)?;
+            }
+            write_margin(&mut w, 0, false, false)?;
+            writeln!(w, "{}: {help}", "Help".fg(self.config.note_color(), s))?;
+        }
+
+        // Note
+        if let Some(note) = &self.note {
+            if !self.config.compact {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w)?;
+            }
+            write_margin(&mut w, 0, false, false)?;
+            writeln!(w, "{}: {note}", "Note".fg(self.config.note_color(), s))?;
+        }
+
+        // Tail of report.
+        // Not to be emitted in compact mode, or if nothing has had the margin printed.
+        if !self.config.compact && !(groups_len == 0 && self.help.is_none() && self.note.is_none())
+        {
+            writeln!(
+                w,
+                "{}",
+                format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
+                    .fg(self.config.margin_color(), s)
+            )?;
+        }
+
         Ok(())
     }
 }
