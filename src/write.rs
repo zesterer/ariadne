@@ -214,6 +214,26 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
         let margin_char = |c: char| c.fg(self.config.margin_color(), s);
 
+        let write_margin = |w: &mut W, idx, is_src_line, is_ellipsis: bool| {
+            let line_num_margin = if is_src_line && !is_ellipsis {
+                format!("{:line_num_width$} {}", idx + 1, draw.vbar)
+                    .fg(self.config.margin_color(), s)
+            } else {
+                format!(
+                    "{}{}",
+                    Rept(' ', line_num_width + 1),
+                    draw.vbar(is_ellipsis)
+                )
+                .fg(self.config.skipped_margin_color(), s)
+            };
+
+            write!(
+                w,
+                " {line_num_margin}{}",
+                Show((!self.config.compact).then_some(' ')),
+            )
+        };
+
         // --- Source sections ---
         let groups_len = groups.len();
         for (
@@ -311,173 +331,151 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 }
             }
 
-            let write_margin = |w: &mut WrappedWriter<W>,
-                                idx: usize,
-                                is_src_line: bool,
-                                is_ellipsis: bool,
-                                draw_labels: bool,
-                                report_row: Option<(usize, bool)>,
-                                line_labels: &[LineLabel],
-                                margin_label: &Option<LineLabel>|
+            let write_margin_and_arrows = |w: &mut WrappedWriter<W>,
+                                           idx: usize,
+                                           is_src_line: bool,
+                                           is_ellipsis: bool,
+                                           report_row: Option<(usize, bool)>,
+                                           line_labels: &[LineLabel],
+                                           margin_label: &Option<LineLabel>|
              -> std::io::Result<()> {
-                let line_num_margin = if is_src_line && !is_ellipsis {
-                    format!("{:line_num_width$} {}", idx + 1, draw.vbar)
-                        .fg(self.config.margin_color(), s)
-                } else {
-                    format!(
-                        "{}{}",
-                        Rept(' ', line_num_width + 1),
-                        draw.vbar(is_ellipsis)
-                    )
-                    .fg(self.config.skipped_margin_color(), s)
-                };
-
-                write!(
-                    w,
-                    " {line_num_margin}{}",
-                    Show((!self.config.compact).then_some(' ')),
-                )?;
+                write_margin(w, idx, is_src_line, is_ellipsis)?;
 
                 // Multi-line margins
-                if draw_labels {
-                    for col in 0..multi_labels_with_message.len()
-                        + (!multi_labels_with_message.is_empty()) as usize
+                for col in 0..multi_labels_with_message.len()
+                    + (!multi_labels_with_message.is_empty()) as usize
+                {
+                    let mut corner = None;
+                    let mut hbar: Option<&LabelInfo> = None;
+                    let mut vbar: Option<&LabelInfo> = None;
+                    let mut margin_ptr = None;
+
+                    let multi_label = multi_labels_with_message.get(col);
+                    let line_span = src.line(idx).unwrap().span();
+
+                    for (i, label) in multi_labels_with_message
+                        [0..(col + 1).min(multi_labels_with_message.len())]
+                        .iter()
+                        .enumerate()
                     {
-                        let mut corner = None;
-                        let mut hbar: Option<&LabelInfo> = None;
-                        let mut vbar: Option<&LabelInfo> = None;
-                        let mut margin_ptr = None;
+                        let margin = margin_label.as_ref().filter(|m| m.is_referencing(label));
 
-                        let multi_label = multi_labels_with_message.get(col);
-                        let line_span = src.line(idx).unwrap().span();
-
-                        for (i, label) in multi_labels_with_message
-                            [0..(col + 1).min(multi_labels_with_message.len())]
-                            .iter()
-                            .enumerate()
+                        if label.char_span.start < line_span.end
+                            && label.char_span.end > line_span.start
                         {
-                            let margin = margin_label.as_ref().filter(|m| m.is_referencing(label));
+                            let is_parent = i != col;
+                            let is_start = line_span.contains(&label.char_span.start);
+                            let is_end = line_span.contains(&label.last_offset());
 
-                            if label.char_span.start < line_span.end
-                                && label.char_span.end > line_span.start
-                            {
-                                let is_parent = i != col;
-                                let is_start = line_span.contains(&label.char_span.start);
-                                let is_end = line_span.contains(&label.last_offset());
-
-                                if let (Some(margin), true) = (margin, is_src_line) {
-                                    margin_ptr = Some((margin, is_start));
-                                } else if !is_start && (!is_end || is_src_line) {
-                                    vbar = vbar.or((!is_parent).then_some(*label));
-                                } else if let Some((report_row, is_arrow)) = report_row {
-                                    let label_row = line_labels
-                                        .iter()
-                                        .enumerate()
-                                        .find(|(_, l)| l.is_referencing(label))
-                                        .map_or(0, |(r, _)| r);
-                                    if report_row == label_row {
-                                        if let Some(margin) = margin {
-                                            vbar = (col == i).then_some(margin.label);
-                                            if is_start {
-                                                continue;
-                                            }
-                                        }
-
-                                        if is_arrow {
-                                            hbar = Some(*label);
-                                            if !is_parent {
-                                                corner = Some((label, is_start));
-                                            }
-                                        } else if !is_start {
-                                            vbar = vbar.or((!is_parent).then_some(*label));
-                                        }
-                                    } else {
-                                        vbar = vbar.or((!is_parent
-                                            && (is_start ^ (report_row < label_row)))
-                                            .then_some(*label));
-                                    }
-                                }
-
-                                if let Some(margin) = margin_label.as_ref().filter(|m| {
-                                    is_end
-                                        && is_src_line
-                                        && std::ptr::eq(*label, m.label)
-                                        && col > i
-                                }) {
-                                    hbar = Some(margin.label);
-                                }
-                            }
-                        }
-
-                        if let (Some((margin, _is_start)), true) = (margin_ptr, is_src_line) {
-                            let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
-                            let is_limit = col + 1 == multi_labels_with_message.len();
-                            if !is_col && !is_limit {
-                                hbar = hbar.or(Some(margin.label));
-                            }
-                        }
-
-                        // hbar = hbar.filter(|l| {
-                        //     margin_label
-                        //         .as_ref()
-                        //         .map_or(false, |margin| !margin.is_referencing(l))
-                        //         || !is_src_line
-                        // });
-
-                        let (a, b) = if let Some((label, is_start)) = corner {
-                            (
-                                Some((draw.arrow_bend(is_start), *label)),
-                                Some((draw.hbar, *label)),
-                            )
-                        } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
-                            (
-                                if self.config.cross_gap {
-                                    Some((draw.vbar, v_label))
-                                } else {
-                                    Some((draw.xbar, v_label))
-                                },
-                                Some((draw.hbar, h_label)),
-                            )
-                        } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
-                            let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
-                            let is_limit = col == multi_labels_with_message.len();
-                            (
-                                Some((
-                                    if is_limit {
-                                        if self.config.multiline_arrows {
-                                            draw.rarrow
-                                        } else {
-                                            draw.hbar
-                                        }
-                                    } else if is_col {
+                            if let (Some(margin), true) = (margin, is_src_line) {
+                                margin_ptr = Some((margin, is_start));
+                            } else if !is_start && (!is_end || is_src_line) {
+                                vbar = vbar.or((!is_parent).then_some(*label));
+                            } else if let Some((report_row, is_arrow)) = report_row {
+                                let label_row = line_labels
+                                    .iter()
+                                    .enumerate()
+                                    .find(|(_, l)| l.is_referencing(label))
+                                    .map_or(0, |(r, _)| r);
+                                if report_row == label_row {
+                                    if let Some(margin) = margin {
+                                        vbar = (col == i).then_some(margin.label);
                                         if is_start {
-                                            draw.ltop
-                                        } else {
-                                            draw.lcross
+                                            continue;
                                         }
+                                    }
+
+                                    if is_arrow {
+                                        hbar = Some(*label);
+                                        if !is_parent {
+                                            corner = Some((label, is_start));
+                                        }
+                                    } else if !is_start {
+                                        vbar = vbar.or((!is_parent).then_some(*label));
+                                    }
+                                } else {
+                                    vbar = vbar
+                                        .or((!is_parent && (is_start ^ (report_row < label_row)))
+                                            .then_some(*label));
+                                }
+                            }
+
+                            if let Some(margin) = margin_label.as_ref().filter(|m| {
+                                is_end && is_src_line && std::ptr::eq(*label, m.label) && col > i
+                            }) {
+                                hbar = Some(margin.label);
+                            }
+                        }
+                    }
+
+                    if let (Some((margin, _is_start)), true) = (margin_ptr, is_src_line) {
+                        let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
+                        let is_limit = col + 1 == multi_labels_with_message.len();
+                        if !is_col && !is_limit {
+                            hbar = hbar.or(Some(margin.label));
+                        }
+                    }
+
+                    // hbar = hbar.filter(|l| {
+                    //     margin_label
+                    //         .as_ref()
+                    //         .map_or(false, |margin| !margin.is_referencing(l))
+                    //         || !is_src_line
+                    // });
+
+                    let (a, b) = if let Some((label, is_start)) = corner {
+                        (
+                            Some((draw.arrow_bend(is_start), *label)),
+                            Some((draw.hbar, *label)),
+                        )
+                    } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
+                        (
+                            if self.config.cross_gap {
+                                Some((draw.vbar, v_label))
+                            } else {
+                                Some((draw.xbar, v_label))
+                            },
+                            Some((draw.hbar, h_label)),
+                        )
+                    } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
+                        let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
+                        let is_limit = col == multi_labels_with_message.len();
+                        (
+                            Some((
+                                if is_limit {
+                                    if self.config.multiline_arrows {
+                                        draw.rarrow
                                     } else {
                                         draw.hbar
-                                    },
-                                    margin.label,
-                                )),
-                                Some((if is_limit { ' ' } else { draw.hbar }, margin.label)),
-                            )
-                        } else if let Some(label) = hbar {
-                            (Some((draw.hbar, label)), Some((draw.hbar, label)))
-                        } else if let Some(label) = vbar {
-                            (Some((draw.vbar(is_ellipsis), label)), None)
-                        } else {
-                            (None, None)
-                        };
+                                    }
+                                } else if is_col {
+                                    if is_start {
+                                        draw.ltop
+                                    } else {
+                                        draw.lcross
+                                    }
+                                } else {
+                                    draw.hbar
+                                },
+                                margin.label,
+                            )),
+                            Some((if is_limit { ' ' } else { draw.hbar }, margin.label)),
+                        )
+                    } else if let Some(label) = hbar {
+                        (Some((draw.hbar, label)), Some((draw.hbar, label)))
+                    } else if let Some(label) = vbar {
+                        (Some((draw.vbar(is_ellipsis), label)), None)
+                    } else {
+                        (None, None)
+                    };
 
-                        let arrow_char = |opt: Option<(char, &LabelInfo<'_>)>| match opt {
-                            Some((c, label)) => c.fg(label.display_info.color, s),
-                            None => ' '.fg(None, s),
-                        };
-                        write!(w, "{}", arrow_char(a))?;
-                        if !self.config.compact {
-                            write!(w, "{}", arrow_char(b))?;
-                        }
+                    let arrow_char = |opt: Option<(char, &LabelInfo<'_>)>| match opt {
+                        Some((c, label)) => c.fg(label.display_info.color, s),
+                        None => ' '.fg(None, s),
+                    };
+                    write!(w, "{}", arrow_char(a))?;
+                    if !self.config.compact {
+                        write!(w, "{}", arrow_char(b))?;
                     }
                 }
 
@@ -591,7 +589,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         is_ellipsis = true;
                     } else {
                         if !self.config.compact && !is_ellipsis {
-                            write_margin(&mut w, idx, false, is_ellipsis, false, None, &[], &None)?;
+                            write_margin(&mut w, idx, false, is_ellipsis)?;
                             writeln!(w)?;
                         }
                         is_ellipsis = true;
@@ -678,12 +676,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 };
 
                 // Margin
-                write_margin(
+                write_margin_and_arrows(
                     &mut w,
                     idx,
                     true,
                     is_ellipsis,
-                    true,
                     None,
                     &line_labels,
                     &margin_label,
@@ -722,12 +719,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         || (line_label.label.display_info.msg.is_some() && !self.config.compact)
                     {
                         // Margin alternate
-                        write_margin(
+                        write_margin_and_arrows(
                             &mut w,
                             idx,
                             false,
                             is_ellipsis,
-                            true,
                             Some((row, false)),
                             &line_labels,
                             &margin_label,
@@ -782,12 +778,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     }
 
                     // Margin
-                    write_margin(
+                    write_margin_and_arrows(
                         &mut w,
                         idx,
                         false,
                         is_ellipsis,
-                        true,
                         Some((row, true)),
                         &line_labels,
                         &margin_label,
@@ -859,7 +854,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             if is_final_group {
                 for (i, help) in self.help.iter().enumerate() {
                     if !self.config.compact {
-                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false)?;
                         writeln!(w)?;
                     }
                     let help_prefix = format!("{} {}", "Help", i + 1);
@@ -870,7 +865,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     };
                     let mut lines = help.lines();
                     if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false)?;
                         if self.help.len() > 1 {
                             writeln!(w, "{}: {line}", help_prefix.fg(self.config.note_color(), s))?;
                         } else {
@@ -878,7 +873,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
                     }
                     for line in lines {
-                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false)?;
                         writeln!(w, "{:>pad$}{line}", "", pad = help_prefix_len + 2)?;
                     }
                 }
@@ -888,7 +883,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             if is_final_group {
                 for (i, note) in self.notes.iter().enumerate() {
                     if !self.config.compact {
-                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false)?;
                         writeln!(w)?;
                     }
                     let note_prefix = format!("{} {}", "Note", i + 1);
@@ -899,7 +894,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     };
                     let mut lines = note.lines();
                     if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false, false, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false)?;
                         if self.notes.len() > 1 {
                             writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
                         } else {
@@ -907,7 +902,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
                     }
                     for line in lines {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        write_margin(&mut w, 0, false, false)?;
                         writeln!(w, "{:>pad$}{line}", "", pad = note_prefix_len + 2)?;
                     }
                 }
@@ -1262,7 +1257,7 @@ mod tests {
             .finish()
             .write_to_string(Source::from(source));
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r"
+        assert_snapshot!(msg, @"
         Error: can't compare äpplës with örängës
            ╭─[ <unknown>:1:12 ]
            │
@@ -1481,7 +1476,7 @@ mod tests {
             .write_to_string(Source::from(source));
         // TODO: it would be nice if the 2nd line wasn't omitted
         // TODO: it would be nice if the lines didn't cross, or at least less so
-        assert_snapshot!(msg, @r"
+        assert_snapshot!(msg, @"
         Error: 
            ╭─[ <unknown>:1:1 ]
            │
