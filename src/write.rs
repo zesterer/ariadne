@@ -429,8 +429,7 @@ impl<S: Span> Report<'_, S> {
                 // instead of normally (vertical).
                 let margin_label = multi_labels_with_message
                     .iter()
-                    .enumerate()
-                    .filter_map(|(_i, label)| {
+                    .filter_map(|label| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start {
