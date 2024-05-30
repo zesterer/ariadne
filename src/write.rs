@@ -202,8 +202,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         let kind_color = self.kind.get_color(&self.config);
         writeln!(
             w,
-            "{} {}",
-            format_args!("{}{}:", Show(code), self.kind).fg(kind_color, s),
+            "{}: {}",
+            format_args!("{}{}", Show(code), self.kind).fg(kind_color, s),
             Show(self.msg.as_ref())
         )?;
 
