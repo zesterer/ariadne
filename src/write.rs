@@ -247,7 +247,6 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         };
 
         // --- Source sections ---
-        let groups_len = groups.len();
         for (
             group_idx,
             SourceGroup {
@@ -256,7 +255,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 labels,
                 ..
             },
-        ) in groups.into_iter().enumerate()
+        ) in groups.iter().enumerate()
         {
             let Some((src, src_name)) = fetch_source(&mut cache, src_id) else {
                 // `fetch_source` should have reported the error.
@@ -264,7 +263,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             };
 
             // File name & reference
-            let (location, index_type) = if src_id == self.span.source() {
+            let (location, index_type) = if *src_id == self.span.source() {
                 (self.span.start(), self.config.index_type)
             } else {
                 // This has already been converted from bytes to chars, if applicable.
@@ -496,7 +495,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             };
 
             let mut is_ellipsis = false;
-            for idx in display_range {
+            for idx in display_range.clone() {
                 let Some(line) = src.line(idx) else {
                     continue;
                 };
@@ -919,7 +918,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         // Tail of report.
         // Not to be emitted in compact mode, or if nothing has had the margin printed.
         if !self.config.compact
-            && !(groups_len == 0 && self.help.is_empty() && self.notes.is_empty())
+            && !(groups.is_empty() && self.help.is_empty() && self.notes.is_empty())
         {
             writeln!(
                 w,
