@@ -206,6 +206,18 @@ impl<S: Span> Report<'_, S> {
                 Show((!self.config.compact).then_some(' ')),
             )
         };
+        let write_spacer_line = |w: &mut W| {
+            if !self.config.compact {
+                writeln!(
+                    w,
+                    "{}{}",
+                    Rept(' ', line_num_width + 2),
+                    margin_char(draw.vbar)
+                )
+            } else {
+                Ok(())
+            }
+        };
 
         // --- Source sections ---
         let groups_len = groups.len();
@@ -254,12 +266,7 @@ impl<S: Span> Report<'_, S> {
             )?;
 
             if !self.config.compact {
-                writeln!(
-                    w,
-                    "{}{}",
-                    Rept(' ', line_num_width + 2),
-                    margin_char(draw.vbar)
-                )?;
+                write_spacer_line(&mut w)?;
             }
 
             // Generate a list of multi-line labels
@@ -825,12 +832,7 @@ impl<S: Span> Report<'_, S> {
                             .fg(self.config.margin_color(), s)
                     )?;
                 } else {
-                    writeln!(
-                        w,
-                        "{}{}",
-                        Rept(' ', line_num_width + 2),
-                        margin_char(draw.vbar)
-                    )?;
+                    write_spacer_line(&mut w)?;
                 }
             }
         }
