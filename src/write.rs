@@ -258,7 +258,12 @@ impl<S: Span> Report<'_, S> {
                 }),
             };
             let (line_no, col_no) = line_and_col
-                .map(|(_, idx, col)| (format!("{}", idx + 1), format!("{}", col + 1)))
+                .map(|(_, idx, col)| {
+                    (
+                        format!("{}", idx + 1 + src.display_line_offset()),
+                        format!("{}", col + 1),
+                    )
+                })
                 .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
             let line_ref = format!(":{}:{}", line_no, col_no);
             writeln!(
