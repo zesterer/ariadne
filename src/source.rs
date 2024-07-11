@@ -94,6 +94,7 @@ pub struct Source<I: AsRef<str> = String> {
     lines: Vec<Line>,
     len: usize,
     byte_len: usize,
+    display_line_offset: usize,
 }
 
 impl<I: AsRef<str>> Source<I> {
@@ -121,6 +122,7 @@ impl<I: AsRef<str>> From<I> for Source<I> {
                 }],
                 len: 0,
                 byte_len: 0,
+                display_line_offset: 0,
             };
         }
 
@@ -162,11 +164,23 @@ impl<I: AsRef<str>> From<I> for Source<I> {
             lines,
             len: char_offset,
             byte_len: byte_offset,
+            display_line_offset: 0,
         }
     }
 }
 
 impl<I: AsRef<str>> Source<I> {
+    /// Add an offset to the printed line numbers
+    pub fn with_display_line_offset(mut self, offset: usize) -> Self {
+        self.display_line_offset = offset;
+        self
+    }
+
+    /// Get the offset added to printed line numbers
+    pub fn display_line_offset(&self) -> usize {
+        self.display_line_offset
+    }
+
     /// Get the length of the total number of characters in the source.
     pub fn len(&self) -> usize {
         self.len
