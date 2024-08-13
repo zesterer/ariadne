@@ -263,7 +263,7 @@ pub enum ReportKind<'a> {
     /// The report is a warning and indicates a likely problem, but not to the extent that the requested action cannot
     /// be performed.
     Warning,
-    /// The report is advice to the user about a potential anti-pattern of other benign issues.
+    /// The report is advice to the user about a potential anti-pattern or other benign issues.
     Advice,
     /// The report is of a kind not built into Ariadne.
     Custom(&'a str, Color),
@@ -466,7 +466,7 @@ impl Config {
     ///
     /// The alternative to this is to insert crossing characters. However, these interact poorly with label colours.
     ///
-    /// If unspecified, this defaults to [`false`].
+    /// If unspecified, this defaults to [`true`].
     pub const fn with_cross_gap(mut self, cross_gap: bool) -> Self {
         self.cross_gap = cross_gap;
         self
@@ -522,7 +522,7 @@ impl Config {
     }
     /// Should this report use byte spans instead of char spans?
     ///
-    /// If unspecified, this defaults to [`false`].
+    /// If unspecified, this defaults to [`IndexType::Char`].
     pub const fn with_index_type(mut self, index_type: IndexType) -> Self {
         self.index_type = index_type;
         self
