@@ -264,9 +264,14 @@ pub struct ReportBuilder<'a, S: Span> {
 }
 
 impl<'a, S: Span> ReportBuilder<'a, S> {
-    /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
-    pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
+    /// Set the numerical code for this report that may be used to more precisely look up the error in documentation.
+    pub fn set_code<C: fmt::Display>(&mut self, code: C) {
         self.code = Some(format!("{:02}", code));
+    }
+    
+    /// Set the numerical code for this report that may be used to more precisely look up the error in documentation.
+    pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
+        self.set_code(code);
         self
     }
 
@@ -275,7 +280,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
         self.msg = Some(msg.to_string());
     }
 
-    /// Add a message to this report.
+    /// Set the message of this report.
     pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
         self.msg = Some(msg.to_string());
         self
@@ -330,8 +335,13 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     }
 
     /// Use the given [`Config`] to determine diagnostic attributes.
-    pub fn with_config(mut self, config: Config) -> Self {
+    pub fn set_config(&mut self, config: Config) {
         self.config = config;
+    }
+
+    /// Use the given [`Config`] to determine diagnostic attributes.
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.set_config(config);
         self
     }
 
