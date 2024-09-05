@@ -22,6 +22,7 @@ use std::{
     hash::Hash,
     io::{self, Write},
     ops::Range,
+    ops::RangeInclusive,
 };
 use unicode_width::UnicodeWidthChar;
 
@@ -86,6 +87,34 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, Range<usize
     }
     fn end(&self) -> usize {
         self.1.end
+    }
+}
+
+impl Span for RangeInclusive<usize> {
+    type SourceId = ();
+
+    fn source(&self) -> &Self::SourceId {
+        &()
+    }
+    fn start(&self) -> usize {
+        *self.start()
+    }
+    fn end(&self) -> usize {
+        *self.end()
+    }
+}
+
+impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, RangeInclusive<usize>) {
+    type SourceId = Id;
+
+    fn source(&self) -> &Self::SourceId {
+        &self.0
+    }
+    fn start(&self) -> usize {
+        *self.1.start()
+    }
+    fn end(&self) -> usize {
+        *self.1.end()
     }
 }
 
