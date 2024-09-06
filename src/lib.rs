@@ -100,7 +100,7 @@ impl Span for RangeInclusive<usize> {
         *self.start()
     }
     fn end(&self) -> usize {
-        *self.end()
+        *self.end() + 1
     }
 }
 
@@ -114,7 +114,7 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, RangeInclus
         *self.1.start()
     }
     fn end(&self) -> usize {
-        *self.1.end()
+        *self.1.end() + 1
     }
 }
 
