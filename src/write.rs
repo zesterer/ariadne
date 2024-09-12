@@ -711,11 +711,9 @@ impl<S: Span> Report<'_, S> {
                 // Arrows
                 for row in 0..line_labels.len() {
                     let line_label = &line_labels[row];
-                    //No message to draw thus no arrow to draw
-                    if line_label.label.display_info.msg.is_none() {
-                        continue;
-                    }
-                    if !self.config.compact {
+                    if (line_label.label.display_info.msg.is_some() || row == 0)
+                        && !self.config.compact
+                    {
                         // Margin alternate
                         write_margin(
                             &mut w,
@@ -772,6 +770,11 @@ impl<S: Span> Report<'_, S> {
                             }
                         }
                         writeln!(w)?;
+                    }
+
+                    // No message to draw thus no arrow to draw
+                    if line_label.label.display_info.msg.is_none() {
+                        continue;
                     }
 
                     // Margin
@@ -952,12 +955,34 @@ mod tests {
             .with_label(Label::new(9..15))
             .finish()
             .write_to_string(Source::from(source));
-        // TODO: it would be nice if these spans still showed up (like codespan-reporting does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
+           | ^^^^^    ^^^^^^  
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn two_labels_without_messages_on_different_lines() {
+        let source = "apple\n== orange;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("can't compare apples with oranges")
+            .with_label(Label::new(0..5))
+            .with_label(Label::new(9..15))
+            .finish()
+            .write_to_string(Source::from(source));
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[<unknown>:1:1]
+           |
+         1 | apple
+           | ^^^^^  
+         2 | == orange;
+           |    ^^^^^^  
         ---'
         "###);
     }
@@ -982,6 +1007,30 @@ mod tests {
            |   `-------------- This is an apple
            |             |    
            |             `---- This is an orange
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn two_labels_with_messages_on_different_lines() {
+        let source = "apple ==\norange;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("can't compare apples with oranges")
+            .with_label(Label::new(0..5).with_message("This is an apple"))
+            .with_label(Label::new(9..15).with_message("This is an orange"))
+            .finish()
+            .write_to_string(Source::from(source));
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[<unknown>:1:1]
+           |
+         1 | apple ==
+           | ^^|^^  
+           |   `---- This is an apple
+         2 | orange;
+           | ^^^|^^  
+           |    `---- This is an orange
         ---'
         "###);
     }
