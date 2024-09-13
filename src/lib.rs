@@ -408,6 +408,8 @@ pub enum LabelAttach {
 pub enum CharSet {
     /// Unicode characters (an attempt is made to use only commonly-supported characters).
     Unicode,
+    /// Unicode characters for box drawing, using straight lines instead of curved ones.
+    UnicodeStraight,
     /// ASCII-only characters.
     Ascii,
 }
