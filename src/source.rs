@@ -23,7 +23,7 @@ pub trait Cache<Id: ?Sized> {
     ///
     /// This function may make use of attributes from the [`Fmt`] trait.
     // TODO: Don't box
-    fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>>;
+    fn display<'a>(&'a self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>>;
 }
 
 impl<'b, C: Cache<Id>, Id: ?Sized> Cache<Id> for &'b mut C {
@@ -32,7 +32,7 @@ impl<'b, C: Cache<Id>, Id: ?Sized> Cache<Id> for &'b mut C {
     fn fetch(&mut self, id: &Id) -> Result<&Source<Self::Storage>, Box<dyn fmt::Debug + '_>> {
         C::fetch(self, id)
     }
-    fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> {
+    fn display<'a>(&'a self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> {
         C::display(self, id)
     }
 }
@@ -43,7 +43,7 @@ impl<C: Cache<Id>, Id: ?Sized> Cache<Id> for Box<C> {
     fn fetch(&mut self, id: &Id) -> Result<&Source<Self::Storage>, Box<dyn fmt::Debug + '_>> {
         C::fetch(self, id)
     }
-    fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> {
+    fn display<'a>(&'a self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> {
         C::display(self, id)
     }
 }
