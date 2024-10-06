@@ -1389,4 +1389,81 @@ mod tests {
         ---'
         "###)
     }
+
+    #[test]
+    fn single_note_single_line() {
+        let source = "apple == orange;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("can't compare apples with oranges")
+            .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+            .with_note("No need to try, they can't be compared.")
+            .finish()
+            .write_to_string(Source::from(source));
+        println!("{}", msg);
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[<unknown>:1:1]
+           |
+         1 | apple == orange;
+           | ^^^^^^^|^^^^^^^  
+           |        `--------- This is a strange comparison
+           | 
+           | Note: No need to try, they can't be compared.
+        ---'
+        "###)
+    }
+
+    fn multi_notes_single_lines() {
+        let source = "apple == orange;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("can't compare apples with oranges")
+            .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+            .with_note("No need to try, they can't be compared.")
+            .with_note("Yeah, really, please stop.")
+            .finish()
+            .write_to_string(Source::from(source));
+        println!("{}", msg);
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[<unknown>:1:1]
+           |
+         1 | apple == orange;
+           | ^^^^^^^|^^^^^^^  
+           |        `--------- This is a strange comparison
+           | 
+           | Note 1: No need to try, they can't be compared.
+           | 
+           | Note 2: Yeah, really, please stop.
+        ---'
+        "###)
+    }
+    #[test]
+    fn multi_notes_multi_lines() {
+        let source = "apple == orange;";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_message("can't compare apples with oranges")
+            .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+            .with_note("No need to try, they can't be compared.")
+            .with_note("Yeah, really, please stop.\nIt has no resemblance.")
+            .finish()
+            .write_to_string(Source::from(source));
+        println!("{}", msg);
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[<unknown>:1:1]
+           |
+         1 | apple == orange;
+           | ^^^^^^^|^^^^^^^  
+           |        `--------- This is a strange comparison
+           | 
+           | Note 1: No need to try, they can't be compared.
+           | 
+           | Note 2: Yeah, really, please stop.
+           |         It has no resemblance.
+        ---'
+        "###)
+    }
 }
