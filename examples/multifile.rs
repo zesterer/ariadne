@@ -40,6 +40,8 @@ fn main() {
             "{} is a number and can only be added to other numbers",
             "Nat".fg(a)
         ))
+        .with_note("Multiple notes are possible".to_string())
+        .with_note("Multiline notes\ncan be also used when the note is humongous.")
         .finish()
         .print(sources(vec![
             ("a.tao", include_str!("a.tao")),
