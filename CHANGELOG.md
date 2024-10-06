@@ -17,7 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-# [0.4.0] - 2023-01-01
+# [0.4.1] - 2024-04-25
+
+### Added
+
+- Support for byte spans
+
+- The ability to fetch the underlying `&str` of a `Source` using `source.as_ref()`
+
+### Changed
+
+- Upgraded `yansi` to `1.0`
+
+# [0.4.0] - 2024-01-01
 
 ### Breaking changes
 
