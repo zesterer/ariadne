@@ -279,7 +279,33 @@ impl<I: AsRef<str>> Cache<()> for Source<I> {
     }
 }
 
+impl<I: AsRef<str>> Cache<()> for &'_ Source<I> {
+    type Storage = I;
+
+    fn fetch(&mut self, _: &()) -> Result<&Source<I>, Box<dyn fmt::Debug + '_>> {
+        Ok(*self)
+    }
+    fn display(&self, _: &()) -> Option<Box<dyn fmt::Display>> {
+        None
+    }
+}
+
 impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, Source<I>) {
+    type Storage = I;
+
+    fn fetch(&mut self, id: &Id) -> Result<&Source<I>, Box<dyn fmt::Debug + '_>> {
+        if id == &self.0 {
+            Ok(&self.1)
+        } else {
+            Err(Box::new(format!("Failed to fetch source '{}'", id)))
+        }
+    }
+    fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> {
+        Some(Box::new(id))
+    }
+}
+
+impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, &'_ Source<I>) {
     type Storage = I;
 
     fn fetch(&mut self, id: &Id) -> Result<&Source<I>, Box<dyn fmt::Debug + '_>> {

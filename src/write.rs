@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::io;
 use std::ops::Range;
 
@@ -1002,9 +1001,9 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an apple
-           |             |    
+           |             |
            |             `---- This is an orange
         ---'
         "###);
@@ -1026,9 +1025,9 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an äpplë
-           |             |    
+           |             |
            |             `---- This is an örängë
         ---'
         "###);
@@ -1050,9 +1049,9 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an äpplë
-           |             |    
+           |             |
            |             `---- This is an örängë
         ---'
         "###);
@@ -1074,9 +1073,9 @@ mod tests {
            ,-[<unknown>:1:10]
            |
          1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an äpplë
-           |             |    
+           |             |
            |             `---- This is an örängë
         ---'
         "###);
@@ -1099,7 +1098,7 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
-           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^^|^^  
+           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^^|^^
            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        `---- This is an orange
         ---'
         "###);
@@ -1120,7 +1119,7 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple ==
-           |          | 
+           |          |
            |          `- Unexpected end of file
         ---'
         "###);
@@ -1140,8 +1139,8 @@ mod tests {
         Error: unexpected end of file
            ,-[<unknown>:1:1]
            |
-         1 | 
-           | | 
+         1 |
+           | |
            | `- No more fruit!
         ---'
         "###);
@@ -1162,10 +1161,10 @@ mod tests {
         Error: unexpected end of file
            ,-[<unknown>:1:1]
            |
-         1 | 
-           | | 
+         1 |
+           | |
            | `- No more fruit!
-           | 
+           |
            | Help: have you tried going to the farmer's market?
         ---'
         "###);
@@ -1186,10 +1185,10 @@ mod tests {
         Error: unexpected end of file
            ,-[<unknown>:1:1]
            |
-         1 | 
-           | | 
+         1 |
+           | |
            | `- No more fruit!
-           | 
+           |
            | Note: eat your greens!
         ---'
         "###);
@@ -1211,12 +1210,12 @@ mod tests {
         Error: unexpected end of file
            ,-[<unknown>:1:1]
            |
-         1 | 
-           | | 
+         1 |
+           | |
            | `- No more fruit!
-           | 
+           |
            | Help: have you tried going to the farmer's market?
-           | 
+           |
            | Note: eat your greens!
         ---'
         "###);
@@ -1248,13 +1247,13 @@ mod tests {
             .write_to_string(Source::from(source));
         // TODO: it would be nice if the 2nd line wasn't omitted
         assert_snapshot!(msg, @r###"
-        Error: 
+        Error:
            ,-[<unknown>:1:1]
            |
          1 | ,-> apple
-           : :   
+           : :
          3 | |-> orange
-           | |           
+           | |
            | `----------- illegal comparison
         ---'
         "###);
@@ -1271,13 +1270,13 @@ mod tests {
             .write_to_string(Source::from(source));
         // TODO: it would be nice if you could tell where the spans start and end.
         assert_snapshot!(msg, @r###"
-        Error: 
+        Error:
            ,-[<unknown>:1:1]
            |
          1 | https://example.com/
-           | ^^|^^^^^^^|^^^^^^^^^  
+           | ^^|^^^^^^^|^^^^^^^^^
            |   `------------------- scheme
-           |           |           
+           |           |
            |           `----------- URL
         ---'
         "###);
@@ -1302,17 +1301,17 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an apple
-           |   |         |    
+           |   |         |
            |   `-------------- Have I mentioned that this is an apple?
-           |   |         |    
+           |   |         |
            |   `-------------- No really, have I mentioned that?
-           |             |    
+           |             |
            |             `---- This is an orange
-           |             |    
+           |             |
            |             `---- Have I mentioned that this is an orange?
-           |             |    
+           |             |
            |             `---- No really, have I mentioned that?
         ---'
         "###)
@@ -1334,11 +1333,11 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an apple
-           |             |    
+           |             |
            |             `---- This is an orange
-           | 
+           |
            | Note: stop trying ... this is a fruitless endeavor
         ---'
         "###)
@@ -1360,11 +1359,11 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an apple
-           |             |    
+           |             |
            |             `---- This is an orange
-           | 
+           |
            | Help: have you tried peeling the orange?
         ---'
         "###)
@@ -1387,13 +1386,13 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^  
+           | ^^|^^    ^^^|^^
            |   `-------------- This is an apple
-           |             |    
+           |             |
            |             `---- This is an orange
-           | 
+           |
            | Help: have you tried peeling the orange?
-           | 
+           |
            | Note: stop trying ... this is a fruitless endeavor
         ---'
         "###)
@@ -1414,9 +1413,9 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^^^^^^|^^^^^^^  
+           | ^^^^^^^|^^^^^^^
            |        `--------- This is a strange comparison
-           | 
+           |
            | Note: No need to try, they can't be compared.
         ---'
         "###)
@@ -1438,11 +1437,11 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^^^^^^|^^^^^^^  
+           | ^^^^^^^|^^^^^^^
            |        `--------- This is a strange comparison
-           | 
+           |
            | Note 1: No need to try, they can't be compared.
-           | 
+           |
            | Note 2: Yeah, really, please stop.
         ---'
         "###)
@@ -1464,11 +1463,11 @@ mod tests {
            ,-[<unknown>:1:1]
            |
          1 | apple == orange;
-           | ^^^^^^^|^^^^^^^  
+           | ^^^^^^^|^^^^^^^
            |        `--------- This is a strange comparison
-           | 
+           |
            | Note 1: No need to try, they can't be compared.
-           | 
+           |
            | Note 2: Yeah, really, please stop.
            |         It has no resemblance.
         ---'
