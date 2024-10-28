@@ -310,7 +310,7 @@ impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, &'_ Source<I>) {
 
     fn fetch(&mut self, id: &Id) -> Result<&Source<I>, Box<dyn fmt::Debug + '_>> {
         if id == &self.0 {
-            Ok(&self.1)
+            Ok(self.1)
         } else {
             Err(Box::new(format!("Failed to fetch source '{}'", id)))
         }

@@ -930,8 +930,6 @@ mod tests {
     //!
     //! and insta will fill it in.
 
-    use std::ops::Range;
-
     use insta::assert_snapshot;
 
     use crate::{Cache, CharSet, Config, IndexType, Label, Report, ReportKind, Source, Span};
