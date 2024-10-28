@@ -264,10 +264,10 @@ impl<S: Span> Report<'_, S> {
                     )
                 })
                 .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
-            let line_ref = format!(":{}:{}", line_no, col_no);
+            let line_ref = format!("{}:{}:{}", src_name, line_no, col_no);
             writeln!(
                 w,
-                "{}{}{}{}{}{}{}",
+                "{}{}{}{} {} {}",
                 Show((' ', line_no_width + 2)),
                 if group_idx == 0 {
                     draw.ltop
@@ -277,7 +277,6 @@ impl<S: Span> Report<'_, S> {
                 .fg(self.config.margin_color(), s),
                 draw.hbar.fg(self.config.margin_color(), s),
                 draw.lbox.fg(self.config.margin_color(), s),
-                src_name,
                 line_ref,
                 draw.rbox.fg(self.config.margin_color(), s),
             )?;
@@ -953,13 +952,19 @@ mod tests {
             .with_char_set(CharSet::Ascii)
     }
 
+    fn remove_trailing(s: String) -> String {
+        s.lines().flat_map(|l| [l.trim_end(), "\n"]).collect()
+    }
+
     #[test]
     fn one_message() {
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .finish()
-            .write_to_string(Source::from(""));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .finish()
+                .write_to_string(Source::from("")),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
         "###)
@@ -968,17 +973,19 @@ mod tests {
     #[test]
     fn two_labels_without_messages() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..5))
-            .with_label(Label::new(9..15))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5))
+                .with_label(Label::new(9..15))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if these spans still showed up (like codespan-reporting does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
         ---'
@@ -988,17 +995,19 @@ mod tests {
     #[test]
     fn two_labels_with_messages() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..5).with_message("This is an apple"))
-            .with_label(Label::new(9..15).with_message("This is an orange"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(Label::new(9..15).with_message("This is an orange"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
@@ -1012,17 +1021,19 @@ mod tests {
     #[test]
     fn multi_byte_chars() {
         let source = "äpplë == örängë;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Char))
-            .with_message("can't compare äpplës with örängës")
-            .with_label(Label::new(0..5).with_message("This is an äpplë"))
-            .with_label(Label::new(9..15).with_message("This is an örängë"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_index_type(IndexType::Char))
+                .with_message("can't compare äpplës with örängës")
+                .with_label(Label::new(0..5).with_message("This is an äpplë"))
+                .with_label(Label::new(9..15).with_message("This is an örängë"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare äpplës with örängës
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | äpplë == örängë;
            | ^^|^^    ^^^|^^
@@ -1036,17 +1047,19 @@ mod tests {
     #[test]
     fn byte_label() {
         let source = "äpplë == örängë;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
-            .with_message("can't compare äpplës with örängës")
-            .with_label(Label::new(0..7).with_message("This is an äpplë"))
-            .with_label(Label::new(11..20).with_message("This is an örängë"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                .with_message("can't compare äpplës with örängës")
+                .with_label(Label::new(0..7).with_message("This is an äpplë"))
+                .with_label(Label::new(11..20).with_message("This is an örängë"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare äpplës with örängës
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | äpplë == örängë;
            | ^^|^^    ^^^|^^
@@ -1060,17 +1073,19 @@ mod tests {
     #[test]
     fn byte_column() {
         let source = "äpplë == örängë;";
-        let msg = Report::build(ReportKind::Error, 11..11)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
-            .with_message("can't compare äpplës with örängës")
-            .with_label(Label::new(0..7).with_message("This is an äpplë"))
-            .with_label(Label::new(11..20).with_message("This is an örängë"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 11..11)
+                .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                .with_message("can't compare äpplës with örängës")
+                .with_label(Label::new(0..7).with_message("This is an äpplë"))
+                .with_label(Label::new(11..20).with_message("This is an örängë"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if these lines didn't cross
         assert_snapshot!(msg, @r###"
         Error: can't compare äpplës with örängës
-           ,-[<unknown>:1:10]
+           ,-[ <unknown>:1:10 ]
            |
          1 | äpplë == örängë;
            | ^^|^^    ^^^|^^
@@ -1084,18 +1099,20 @@ mod tests {
     #[test]
     fn label_at_end_of_long_line() {
         let source = format!("{}orange", "apple == ".repeat(100));
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(
-                Label::new(source.len() - 5..source.len()).with_message("This is an orange"),
-            )
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(
+                    Label::new(source.len() - 5..source.len()).with_message("This is an orange"),
+                )
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if the start of long lines would be omitted (like rustc does)
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^^|^^
@@ -1107,16 +1124,18 @@ mod tests {
     #[test]
     fn label_of_width_zero_at_end_of_line() {
         let source = "apple ==\n";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
-            .with_message("unexpected end of file")
-            .with_label(Label::new(9..9).with_message("Unexpected end of file"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                .with_message("unexpected end of file")
+                .with_label(Label::new(9..9).with_message("Unexpected end of file"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple ==
            |          |
@@ -1128,16 +1147,18 @@ mod tests {
     #[test]
     fn empty_input() {
         let source = "";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("unexpected end of file")
-            .with_label(Label::new(0..0).with_message("No more fruit!"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("unexpected end of file")
+                .with_label(Label::new(0..0).with_message("No more fruit!"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 |
            | |
@@ -1149,17 +1170,19 @@ mod tests {
     #[test]
     fn empty_input_help() {
         let source = "";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("unexpected end of file")
-            .with_label(Label::new(0..0).with_message("No more fruit!"))
-            .with_help("have you tried going to the farmer's market?")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("unexpected end of file")
+                .with_label(Label::new(0..0).with_message("No more fruit!"))
+                .with_help("have you tried going to the farmer's market?")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 |
            | |
@@ -1173,17 +1196,19 @@ mod tests {
     #[test]
     fn empty_input_note() {
         let source = "";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("unexpected end of file")
-            .with_label(Label::new(0..0).with_message("No more fruit!"))
-            .with_note("eat your greens!")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("unexpected end of file")
+                .with_label(Label::new(0..0).with_message("No more fruit!"))
+                .with_note("eat your greens!")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 |
            | |
@@ -1197,18 +1222,20 @@ mod tests {
     #[test]
     fn empty_input_help_note() {
         let source = "";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("unexpected end of file")
-            .with_label(Label::new(0..0).with_message("No more fruit!"))
-            .with_note("eat your greens!")
-            .with_help("have you tried going to the farmer's market?")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("unexpected end of file")
+                .with_label(Label::new(0..0).with_message("No more fruit!"))
+                .with_note("eat your greens!")
+                .with_help("have you tried going to the farmer's market?")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
 
         assert_snapshot!(msg, @r###"
         Error: unexpected end of file
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 |
            | |
@@ -1227,12 +1254,14 @@ mod tests {
 
         for i in 0..=source.len() {
             for j in i..=source.len() {
-                let _ = Report::build(ReportKind::Error, 0..0)
-                    .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
-                    .with_message("Label")
-                    .with_label(Label::new(i..j).with_message("Label"))
-                    .finish()
-                    .write_to_string(Source::from(source));
+                let _ = remove_trailing(
+                    Report::build(ReportKind::Error, 0..0)
+                        .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                        .with_message("Label")
+                        .with_label(Label::new(i..j).with_message("Label"))
+                        .finish()
+                        .write_to_string(Source::from(source)),
+                );
             }
         }
     }
@@ -1240,15 +1269,17 @@ mod tests {
     #[test]
     fn multiline_label() {
         let source = "apple\n==\norange";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if the 2nd line wasn't omitted
         assert_snapshot!(msg, @r###"
         Error:
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | ,-> apple
            : :
@@ -1262,16 +1293,18 @@ mod tests {
     #[test]
     fn partially_overlapping_labels() {
         let source = "https://example.com/";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_label(Label::new(0..source.len()).with_message("URL"))
-            .with_label(Label::new(0..source.find(':').unwrap()).with_message("scheme"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_label(Label::new(0..source.len()).with_message("URL"))
+                .with_label(Label::new(0..source.find(':').unwrap()).with_message("scheme"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         // TODO: it would be nice if you could tell where the spans start and end.
         assert_snapshot!(msg, @r###"
         Error:
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | https://example.com/
            | ^^|^^^^^^^|^^^^^^^^^
@@ -1285,20 +1318,26 @@ mod tests {
     #[test]
     fn multiple_labels_same_span() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..5).with_message("This is an apple"))
-            .with_label(Label::new(0..5).with_message("Have I mentioned that this is an apple?"))
-            .with_label(Label::new(0..5).with_message("No really, have I mentioned that?"))
-            .with_label(Label::new(9..15).with_message("This is an orange"))
-            .with_label(Label::new(9..15).with_message("Have I mentioned that this is an orange?"))
-            .with_label(Label::new(9..15).with_message("No really, have I mentioned that?"))
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(
+                    Label::new(0..5).with_message("Have I mentioned that this is an apple?"),
+                )
+                .with_label(Label::new(0..5).with_message("No really, have I mentioned that?"))
+                .with_label(Label::new(9..15).with_message("This is an orange"))
+                .with_label(
+                    Label::new(9..15).with_message("Have I mentioned that this is an orange?"),
+                )
+                .with_label(Label::new(9..15).with_message("No really, have I mentioned that?"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
@@ -1320,17 +1359,19 @@ mod tests {
     #[test]
     fn note() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..5).with_message("This is an apple"))
-            .with_label(Label::new(9..15).with_message("This is an orange"))
-            .with_note("stop trying ... this is a fruitless endeavor")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(Label::new(9..15).with_message("This is an orange"))
+                .with_note("stop trying ... this is a fruitless endeavor")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
@@ -1346,17 +1387,19 @@ mod tests {
     #[test]
     fn help() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..5).with_message("This is an apple"))
-            .with_label(Label::new(9..15).with_message("This is an orange"))
-            .with_help("have you tried peeling the orange?")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(Label::new(9..15).with_message("This is an orange"))
+                .with_help("have you tried peeling the orange?")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
@@ -1372,18 +1415,20 @@ mod tests {
     #[test]
     fn help_and_note() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..5).with_message("This is an apple"))
-            .with_label(Label::new(9..15).with_message("This is an orange"))
-            .with_help("have you tried peeling the orange?")
-            .with_note("stop trying ... this is a fruitless endeavor")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(Label::new(9..15).with_message("This is an orange"))
+                .with_help("have you tried peeling the orange?")
+                .with_note("stop trying ... this is a fruitless endeavor")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
@@ -1401,16 +1446,18 @@ mod tests {
     #[test]
     fn single_note_single_line() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..15).with_message("This is a strange comparison"))
-            .with_note("No need to try, they can't be compared.")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+                .with_note("No need to try, they can't be compared.")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^^^^^^|^^^^^^^
@@ -1424,17 +1471,19 @@ mod tests {
     #[test]
     fn multi_notes_single_lines() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..15).with_message("This is a strange comparison"))
-            .with_note("No need to try, they can't be compared.")
-            .with_note("Yeah, really, please stop.")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+                .with_note("No need to try, they can't be compared.")
+                .with_note("Yeah, really, please stop.")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^^^^^^|^^^^^^^
@@ -1450,17 +1499,19 @@ mod tests {
     #[test]
     fn multi_notes_multi_lines() {
         let source = "apple == orange;";
-        let msg = Report::build(ReportKind::Error, 0..0)
-            .with_config(no_color_and_ascii())
-            .with_message("can't compare apples with oranges")
-            .with_label(Label::new(0..15).with_message("This is a strange comparison"))
-            .with_note("No need to try, they can't be compared.")
-            .with_note("Yeah, really, please stop.\nIt has no resemblance.")
-            .finish()
-            .write_to_string(Source::from(source));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+                .with_note("No need to try, they can't be compared.")
+                .with_note("Yeah, really, please stop.\nIt has no resemblance.")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
-           ,-[<unknown>:1:1]
+           ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
            | ^^^^^^^|^^^^^^^
