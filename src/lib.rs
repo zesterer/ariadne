@@ -204,25 +204,21 @@ pub struct Report<'a, S: Span = Range<usize>> {
     msg: Option<String>,
     notes: Vec<String>,
     help: Option<String>,
-    location: (<S::SourceId as ToOwned>::Owned, usize),
+    span: S,
     labels: Vec<Label<S>>,
     config: Config,
 }
 
 impl<S: Span> Report<'_, S> {
     /// Begin building a new [`Report`].
-    pub fn build<Id: Into<<S::SourceId as ToOwned>::Owned>>(
-        kind: ReportKind,
-        src_id: Id,
-        offset: usize,
-    ) -> ReportBuilder<S> {
+    pub fn build(kind: ReportKind, span: S) -> ReportBuilder<S> {
         ReportBuilder {
             kind,
             code: None,
             msg: None,
             notes: vec![],
             help: None,
-            location: (src_id.into(), offset),
+            span,
             labels: Vec::new(),
             config: Config::default(),
         }
@@ -287,7 +283,7 @@ pub struct ReportBuilder<'a, S: Span> {
     msg: Option<String>,
     notes: Vec<String>,
     help: Option<String>,
-    location: (<S::SourceId as ToOwned>::Owned, usize),
+    span: S,
     labels: Vec<Label<S>>,
     config: Config,
 }
@@ -384,7 +380,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
             msg: self.msg,
             notes: self.notes,
             help: self.help,
-            location: self.location,
+            span: self.span,
             labels: self.labels,
             config: self.config,
         }

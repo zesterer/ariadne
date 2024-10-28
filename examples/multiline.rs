@@ -9,7 +9,7 @@ fn main() {
     let out = Color::Fixed(81);
     let out2 = colors.next();
 
-    Report::build(ReportKind::Error, "sample.tao", 12)
+    Report::build(ReportKind::Error, ("sample.tao", 32..33))
         .with_code(3)
         .with_message("Incompatible types".to_string())
         .with_label(
