@@ -211,6 +211,8 @@ pub struct Report<'a, S: Span = Range<usize>> {
 
 impl<S: Span> Report<'_, S> {
     /// Begin building a new [`Report`].
+    ///
+    /// The span is the primary location at which the error should be reported.
     pub fn build(kind: ReportKind, span: S) -> ReportBuilder<S> {
         ReportBuilder {
             kind,

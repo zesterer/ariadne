@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+# [0.5.0] - 2024-10-28
+
+### Changed
+
+- Made `Report::build` accept a proper span, avoiding much type annotation trouble
+
 # [0.4.1] - 2024-04-25
 
 ### Added

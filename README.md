@@ -24,7 +24,7 @@ fn main() {
     let b = colors.next();
     let out = Color::Fixed(81);
 
-    Report::build(ReportKind::Error, "sample.tao", 12)
+    Report::build(ReportKind::Error, ("sample.tao", 12..12))
         .with_code(3)
         .with_message(format!("Incompatible types"))
         .with_label(
