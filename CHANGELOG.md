@@ -19,9 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # [0.5.0] - 2024-10-28
 
+### Added
+
+- Support for multi-line notes
+- Support for `RangeInclusive` as spans
+
 ### Changed
 
 - Made `Report::build` accept a proper span, avoiding much type annotation trouble
+
+### Fixed
+
+- Handling of empty lines
+- `Config::new()` is now `const`
+- Several subtle formatting bugs
 
 # [0.4.1] - 2024-04-25
 
