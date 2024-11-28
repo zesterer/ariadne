@@ -267,13 +267,24 @@ pub enum ReportKind<'a> {
     Custom(&'a str, Color),
 }
 
+impl ReportKind<'_> {
+    fn color(&self, config: &Config) -> Option<Color> {
+        match self {
+            ReportKind::Error => config.error_color(),
+            ReportKind::Warning => config.warning_color(),
+            ReportKind::Advice => config.advice_color(),
+            ReportKind::Custom(_, color) => Some(*color),
+        }
+    }
+}
+
 impl fmt::Display for ReportKind<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ReportKind::Error => write!(f, "Error"),
             ReportKind::Warning => write!(f, "Warning"),
             ReportKind::Advice => write!(f, "Advice"),
-            ReportKind::Custom(s, _) => write!(f, "{}", s),
+            ReportKind::Custom(s, _) => write!(f, "{s}"),
         }
     }
 }
