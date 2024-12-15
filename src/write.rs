@@ -40,7 +40,7 @@ struct SourceGroup<'a, S: Span> {
     labels: Vec<LabelInfo<'a>>,
 }
 
-impl<S: Span> Report<'_, S> {
+impl<K: ReportKind, S: Span> Report<K, S> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
         let mut groups = Vec::new();
         for label in self.labels.iter() {
@@ -170,13 +170,8 @@ impl<S: Span> Report<'_, S> {
         // --- Header ---
 
         let code = self.code.as_ref().map(|c| format!("[{}] ", c));
-        let id = format!("{}{}:", Show(code), self.kind);
-        let kind_color = match self.kind {
-            ReportKind::Error => self.config.error_color(),
-            ReportKind::Warning => self.config.warning_color(),
-            ReportKind::Advice => self.config.advice_color(),
-            ReportKind::Custom(_, color) => Some(color),
-        };
+        let id = format!("{}{}:", Show(code), self.kind.name());
+        let kind_color = self.config.color.then_some(self.kind.color());
         writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
 
         let groups = self.get_source_groups(&mut cache);
@@ -932,9 +927,11 @@ mod tests {
 
     use insta::assert_snapshot;
 
-    use crate::{Cache, CharSet, Config, IndexType, Label, Report, ReportKind, Source, Span};
+    use crate::{
+        Cache, CharSet, Config, ErrorKind, IndexType, Label, Report, ReportKind, Source, Span,
+    };
 
-    impl<S: Span> Report<'_, S> {
+    impl<K: ReportKind, S: Span> Report<K, S> {
         fn write_to_string<C: Cache<S::SourceId>>(&self, cache: C) -> String {
             let mut vec = Vec::new();
             self.write(cache, &mut vec).unwrap();
@@ -957,7 +954,7 @@ mod tests {
     #[test]
     fn one_message() {
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .finish()
@@ -972,7 +969,7 @@ mod tests {
     fn two_labels_without_messages() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5))
@@ -994,7 +991,7 @@ mod tests {
     fn two_labels_with_messages() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
@@ -1020,7 +1017,7 @@ mod tests {
     fn multi_byte_chars() {
         let source = "äpplë == örängë;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii().with_index_type(IndexType::Char))
                 .with_message("can't compare äpplës with örängës")
                 .with_label(Label::new(0..5).with_message("This is an äpplë"))
@@ -1046,7 +1043,7 @@ mod tests {
     fn byte_label() {
         let source = "äpplë == örängë;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
                 .with_message("can't compare äpplës with örängës")
                 .with_label(Label::new(0..7).with_message("This is an äpplë"))
@@ -1072,7 +1069,7 @@ mod tests {
     fn byte_column() {
         let source = "äpplë == örängë;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 11..11)
+            Report::build(ErrorKind, 11..11)
                 .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
                 .with_message("can't compare äpplës with örängës")
                 .with_label(Label::new(0..7).with_message("This is an äpplë"))
@@ -1098,7 +1095,7 @@ mod tests {
     fn label_at_end_of_long_line() {
         let source = format!("{}orange", "apple == ".repeat(100));
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(
@@ -1123,7 +1120,7 @@ mod tests {
     fn label_of_width_zero_at_end_of_line() {
         let source = "apple ==\n";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
                 .with_message("unexpected end of file")
                 .with_label(Label::new(9..9).with_message("Unexpected end of file"))
@@ -1146,7 +1143,7 @@ mod tests {
     fn empty_input() {
         let source = "";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
@@ -1169,7 +1166,7 @@ mod tests {
     fn empty_input_help() {
         let source = "";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
@@ -1195,7 +1192,7 @@ mod tests {
     fn empty_input_note() {
         let source = "";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
@@ -1221,7 +1218,7 @@ mod tests {
     fn empty_input_help_note() {
         let source = "";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
@@ -1253,7 +1250,7 @@ mod tests {
         for i in 0..=source.len() {
             for j in i..=source.len() {
                 let _ = remove_trailing(
-                    Report::build(ReportKind::Error, 0..0)
+                    Report::build(ErrorKind, 0..0)
                         .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
                         .with_message("Label")
                         .with_label(Label::new(i..j).with_message("Label"))
@@ -1268,7 +1265,7 @@ mod tests {
     fn multiline_label() {
         let source = "apple\n==\norange";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
                 .finish()
@@ -1292,7 +1289,7 @@ mod tests {
     fn partially_overlapping_labels() {
         let source = "https://example.com/";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_label(Label::new(0..source.len()).with_message("URL"))
                 .with_label(Label::new(0..source.find(':').unwrap()).with_message("scheme"))
@@ -1317,7 +1314,7 @@ mod tests {
     fn multiple_labels_same_span() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
@@ -1358,7 +1355,7 @@ mod tests {
     fn note() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
@@ -1386,7 +1383,7 @@ mod tests {
     fn help() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
@@ -1414,7 +1411,7 @@ mod tests {
     fn help_and_note() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
@@ -1445,7 +1442,7 @@ mod tests {
     fn single_note_single_line() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..15).with_message("This is a strange comparison"))
@@ -1470,7 +1467,7 @@ mod tests {
     fn multi_notes_single_lines() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..15).with_message("This is a strange comparison"))
@@ -1498,7 +1495,7 @@ mod tests {
     fn multi_notes_multi_lines() {
         let source = "apple == orange;";
         let msg = remove_trailing(
-            Report::build(ReportKind::Error, 0..0)
+            Report::build(ErrorKind, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..15).with_message("This is a strange comparison"))

@@ -1,4 +1,4 @@
-use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
+use ariadne::{Color, ColorGenerator, ErrorKind, Fmt, Label, Report, Source};
 
 fn main() {
     let mut colors = ColorGenerator::new();
@@ -9,7 +9,7 @@ fn main() {
     let out = Color::Fixed(81);
     let out2 = colors.next();
 
-    Report::build(ReportKind::Error, ("sample.tao", 32..33))
+    Report::build(ErrorKind, ("sample.tao", 32..33))
         .with_code(3)
         .with_message("Incompatible types".to_string())
         .with_label(

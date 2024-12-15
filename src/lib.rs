@@ -16,6 +16,7 @@ pub use yansi::Color;
 pub use crate::draw::StdoutFmt;
 
 use crate::display::*;
+use std::fmt::Debug;
 use std::{
     cmp::{Eq, PartialEq},
     fmt,
@@ -198,8 +199,8 @@ impl<S: Span> Label<S> {
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
-pub struct Report<'a, S: Span = Range<usize>> {
-    kind: ReportKind<'a>,
+pub struct Report<K, S: Span = Range<usize>> {
+    kind: K,
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
@@ -209,11 +210,11 @@ pub struct Report<'a, S: Span = Range<usize>> {
     config: Config,
 }
 
-impl<S: Span> Report<'_, S> {
+impl<K: ReportKind, S: Span> Report<K, S> {
     /// Begin building a new [`Report`].
     ///
     /// The span is the primary location at which the error should be reported.
-    pub fn build(kind: ReportKind, span: S) -> ReportBuilder<S> {
+    pub fn build(kind: K, span: S) -> ReportBuilder<K, S> {
         ReportBuilder {
             kind,
             code: None,
@@ -240,7 +241,7 @@ impl<S: Span> Report<'_, S> {
     }
 }
 
-impl<'a, S: Span> fmt::Debug for Report<'a, S> {
+impl<K: Debug, S: Span> fmt::Debug for Report<K, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Report")
             .field("kind", &self.kind)
@@ -252,35 +253,60 @@ impl<'a, S: Span> fmt::Debug for Report<'a, S> {
             .finish()
     }
 }
+
 /// A type that defines the kind of report being produced.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ReportKind<'a> {
-    /// The report is an error and indicates a critical problem that prevents the program performing the requested
-    /// action.
-    Error,
-    /// The report is a warning and indicates a likely problem, but not to the extent that the requested action cannot
-    /// be performed.
-    Warning,
-    /// The report is advice to the user about a potential anti-pattern of other benign issues.
-    Advice,
-    /// The report is of a kind not built into Ariadne.
-    Custom(&'a str, Color),
+pub trait ReportKind {
+    /// The name of the report kind. This will be displayed in the output.
+    fn name(&self) -> &str;
+
+    /// The color that should be used for reports of this kind.
+    fn color(&self) -> Color;
 }
 
-impl fmt::Display for ReportKind<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ReportKind::Error => write!(f, "Error"),
-            ReportKind::Warning => write!(f, "Warning"),
-            ReportKind::Advice => write!(f, "Advice"),
-            ReportKind::Custom(s, _) => write!(f, "{}", s),
-        }
+/// The report is an error and indicates a critical problem that prevents the program performing the requested
+/// action.
+pub struct ErrorKind;
+
+impl ReportKind for ErrorKind {
+    fn name(&self) -> &str {
+        "Error"
+    }
+
+    fn color(&self) -> Color {
+        Color::Red
+    }
+}
+
+/// The report is a warning and indicates a likely problem, but not to the extent that the requested action cannot
+/// be performed.
+pub struct WarningKind;
+
+impl ReportKind for WarningKind {
+    fn name(&self) -> &str {
+        "Warning"
+    }
+
+    fn color(&self) -> Color {
+        Color::Yellow
+    }
+}
+
+/// The report is advice to the user about a potential anti-pattern of other benign issues.
+pub struct AdviceKind;
+
+impl ReportKind for AdviceKind {
+    fn name(&self) -> &str {
+        "Advice"
+    }
+
+    fn color(&self) -> Color {
+        Color::Fixed(147)
     }
 }
 
 /// A type used to build a [`Report`].
-pub struct ReportBuilder<'a, S: Span> {
-    kind: ReportKind<'a>,
+pub struct ReportBuilder<K, S: Span> {
+    kind: K,
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
@@ -290,7 +316,7 @@ pub struct ReportBuilder<'a, S: Span> {
     config: Config,
 }
 
-impl<'a, S: Span> ReportBuilder<'a, S> {
+impl<K, S: Span> ReportBuilder<K, S> {
     /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
     pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
         self.code = Some(format!("{:02}", code));
@@ -375,7 +401,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     }
 
     /// Finish building the [`Report`].
-    pub fn finish(self) -> Report<'a, S> {
+    pub fn finish(self) -> Report<K, S> {
         Report {
             kind: self.kind,
             code: self.code,
@@ -389,7 +415,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     }
 }
 
-impl<'a, S: Span> fmt::Debug for ReportBuilder<'a, S> {
+impl<K: Debug, S: Span> fmt::Debug for ReportBuilder<K, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)
@@ -512,15 +538,6 @@ impl Config {
         self
     }
 
-    fn error_color(&self) -> Option<Color> {
-        Some(Color::Red).filter(|_| self.color)
-    }
-    fn warning_color(&self) -> Option<Color> {
-        Some(Color::Yellow).filter(|_| self.color)
-    }
-    fn advice_color(&self) -> Option<Color> {
-        Some(Color::Fixed(147)).filter(|_| self.color)
-    }
     fn margin_color(&self) -> Option<Color> {
         Some(Color::Fixed(246)).filter(|_| self.color)
     }
