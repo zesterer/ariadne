@@ -120,11 +120,18 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, RangeInclus
 
 /// A type that represents the way a label should be displayed.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-struct LabelDisplay {
+pub struct LabelDisplay {
     msg: Option<String>,
     color: Option<Color>,
     order: i32,
     priority: i32,
+}
+
+impl LabelDisplay {
+    /// getter for msg
+    pub fn msg(&self) -> Option<&str> {
+        self.msg.as_deref()
+    }
 }
 
 /// A type that represents a labelled section of source code.
@@ -194,6 +201,16 @@ impl<S: Span> Label<S> {
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.display_info.priority = priority;
         self
+    }
+
+    /// getter for span
+    pub fn span(&self) -> &S {
+        &self.span
+    }
+
+    /// getter for display_info
+    pub fn display_info(&self) -> &LabelDisplay {
+        &self.display_info
     }
 }
 
