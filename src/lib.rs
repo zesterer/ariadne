@@ -195,6 +195,16 @@ impl<S: Span> Label<S> {
         self.display_info.priority = priority;
         self
     }
+
+    /// getter for span
+    pub fn span(&self) -> &S {
+        &self.span
+    }
+
+    /// getter for display_info
+    pub fn display_info(&self) -> &LabelDisplay {
+        &self.display_info
+    }
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
