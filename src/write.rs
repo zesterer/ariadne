@@ -856,13 +856,37 @@ impl<S: Span> Report<'_, S> {
             let is_final_group = group_idx + 1 == groups_len;
 
             // Help
-            if let (Some(note), true) = (&self.help, is_final_group) {
-                if !self.config.compact {
-                    write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                    writeln!(w)?;
+            if is_final_group {
+                for (i, help) in self.help.iter().enumerate() {
+                    if !self.config.compact {
+                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        writeln!(w)?;
+                    }
+                    let help_prefix = format!("{} {}", "Help", i + 1);
+                    let help_prefix_len = if self.help.len() > 1 {
+                        help_prefix.len()
+                    } else {
+                        4
+                    };
+                    let mut lines = help.lines();
+                    if let Some(line) = lines.next() {
+                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        if self.help.len() > 1 {
+                            writeln!(
+                                w,
+                                "{}: {}",
+                                help_prefix.fg(self.config.note_color(), s),
+                                line
+                            )?;
+                        } else {
+                            writeln!(w, "{}: {}", "Help".fg(self.config.note_color(), s), line)?;
+                        }
+                    }
+                    for line in lines {
+                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
+                        writeln!(w, "{:>pad$}{}", "", line, pad = help_prefix_len + 2)?;
+                    }
                 }
-                write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                writeln!(w, "{}: {}", "Help".fg(self.config.note_color(), s), note)?;
             }
 
             // Note
@@ -1518,6 +1542,35 @@ mod tests {
            | Note 1: No need to try, they can't be compared.
            |
            | Note 2: Yeah, really, please stop.
+           |         It has no resemblance.
+        ---'
+        "###)
+    }
+
+    #[test]
+    fn multi_helps_multi_lines() {
+        let source = "apple == orange;";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+                .with_help("No need to try, they can't be compared.")
+                .with_help("Yeah, really, please stop.\nIt has no resemblance.")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[ <unknown>:1:1 ]
+           |
+         1 | apple == orange;
+           | ^^^^^^^|^^^^^^^
+           |        `--------- This is a strange comparison
+           |
+           | Help 1: No need to try, they can't be compared.
+           |
+           | Help 2: Yeah, really, please stop.
            |         It has no resemblance.
         ---'
         "###)
