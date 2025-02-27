@@ -203,7 +203,7 @@ pub struct Report<'a, S: Span = Range<usize>> {
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
-    help: Option<String>,
+    help: Vec<String>,
     span: S,
     labels: Vec<Label<S>>,
     config: Config,
@@ -219,7 +219,7 @@ impl<S: Span> Report<'_, S> {
             code: None,
             msg: None,
             notes: vec![],
-            help: None,
+            help: vec![],
             span,
             labels: Vec::new(),
             config: Config::default(),
@@ -284,7 +284,7 @@ pub struct ReportBuilder<'a, S: Span> {
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
-    help: Option<String>,
+    help: Vec<String>,
     span: S,
     labels: Vec<Label<S>>,
     config: Config,
@@ -333,12 +333,24 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
 
     /// Set the help message of this report.
     pub fn set_help<N: ToString>(&mut self, note: N) {
-        self.help = Some(note.to_string());
+        self.help = vec![note.to_string()];
+    }
+
+    /// Add a help message to this report.
+    pub fn add_help<N: ToString>(&mut self, note: N) {
+        self.help.push(note.to_string());
+    }
+
+    /// Set the help messages of this report.
+    pub fn with_helps<N: IntoIterator<Item = impl ToString>>(&mut self, helps: N) {
+        for help in helps {
+            self.add_help(help)
+        }
     }
 
     /// Set the help message of this report.
     pub fn with_help<N: ToString>(mut self, note: N) -> Self {
-        self.set_help(note);
+        self.add_help(note);
         self
     }
 
