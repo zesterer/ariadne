@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+# [0.5.1] - 2025-03-13
+
+### Added
+
+- impl `Cache` for `&Source`
+- Multiple and multiline help support
+
+## Changed
+
+- Use RPITIT instead of `Box<dyn ...>` for caches
+
 # [0.5.0] - 2024-10-28
 
 ### Added
