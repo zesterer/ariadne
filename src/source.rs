@@ -270,7 +270,7 @@ impl<I: AsRef<str>> Source<I> {
 impl<I: AsRef<str>> Cache<()> for Source<I> {
     type Storage = I;
 
-    fn fetch(&mut self, _: &()) -> Result<&Source<I>, impl fmt::Debug + '_> {
+    fn fetch(&mut self, _: &()) -> Result<&Source<I>, impl fmt::Debug> {
         Ok::<_, ()>(self)
     }
     fn display<'a>(&self, _: &'a ()) -> Option<impl fmt::Display + 'a> {
@@ -281,18 +281,18 @@ impl<I: AsRef<str>> Cache<()> for Source<I> {
 impl<I: AsRef<str>> Cache<()> for &'_ Source<I> {
     type Storage = I;
 
-    fn fetch(&mut self, _: &()) -> Result<&Source<I>, Box<dyn fmt::Debug + '_>> {
-        Ok(*self)
+    fn fetch(&mut self, _: &()) -> Result<&Source<I>, impl fmt::Debug> {
+        Ok::<_, ()>(*self)
     }
-    fn display(&self, _: &()) -> Option<Box<dyn fmt::Display>> {
-        None
+    fn display<'a>(&self, _: &'a ()) -> Option<impl fmt::Display + 'a> {
+        None::<u8>
     }
 }
 
 impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, Source<I>) {
     type Storage = I;
 
-    fn fetch(&mut self, id: &Id) -> Result<&Source<I>, impl fmt::Debug + '_> {
+    fn fetch(&mut self, id: &Id) -> Result<&Source<I>, impl fmt::Debug> {
         if id == &self.0 {
             Ok(&self.1)
         } else {
@@ -307,14 +307,14 @@ impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, Source<I>) {
 impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, &'_ Source<I>) {
     type Storage = I;
 
-    fn fetch(&mut self, id: &Id) -> Result<&Source<I>, Box<dyn fmt::Debug + '_>> {
+    fn fetch(&mut self, id: &Id) -> Result<&Source<I>, impl fmt::Debug> {
         if id == &self.0 {
             Ok(self.1)
         } else {
             Err(Box::new(format!("Failed to fetch source '{}'", id)))
         }
     }
-    fn display<'a>(&self, id: &'a Id) -> Option<Box<dyn fmt::Display + 'a>> {
+    fn display<'a>(&self, id: &'a Id) -> Option<impl fmt::Display + 'a> {
         Some(Box::new(id))
     }
 }
@@ -328,7 +328,7 @@ pub struct FileCache {
 impl Cache<Path> for FileCache {
     type Storage = String;
 
-    fn fetch(&mut self, path: &Path) -> Result<&Source, impl fmt::Debug + '_> {
+    fn fetch(&mut self, path: &Path) -> Result<&Source, impl fmt::Debug> {
         Ok::<_, Error>(match self.files.entry(path.to_path_buf()) {
             // TODO: Don't allocate here
             Entry::Occupied(entry) => entry.into_mut(),
