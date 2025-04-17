@@ -398,8 +398,8 @@ where
 pub fn sources<Id, S, I>(iter: I) -> impl Cache<Id>
 where
     Id: fmt::Display + Hash + PartialEq + Eq + Clone + 'static,
-    I: IntoIterator<Item = (Id, S)>,
     S: AsRef<str>,
+    I: IntoIterator<Item = (Id, S)>,
 {
     FnCache::new((move |id| Err(format!("Failed to fetch source '{}'", id))) as fn(&_) -> _)
         .with_sources(
