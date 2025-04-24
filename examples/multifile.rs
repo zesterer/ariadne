@@ -1,4 +1,4 @@
-use ariadne::{sources, ColorGenerator, Fmt, Label, Report, ReportKind};
+use ariadne::{sources, ColorGenerator, ErrorKind, Fmt, Label, Report};
 
 fn main() {
     let mut colors = ColorGenerator::new();
@@ -8,7 +8,7 @@ fn main() {
     let b = colors.next();
     let c = colors.next();
 
-    Report::build(ReportKind::Error, ("b.tao", 10..14))
+    Report::build(ErrorKind, ("b.tao", 10..14))
         .with_code(3)
         .with_message("Cannot add types Nat and Str".to_string())
         .with_label(
