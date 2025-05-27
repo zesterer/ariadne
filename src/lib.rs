@@ -437,7 +437,7 @@ pub enum CharSet {
 /// Possible character sets to use when rendering diagnostics.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum IndexType {
-    /// Byte spans. Always results in O(1) loopups
+    /// Byte spans. Always results in O(1) lookups
     Byte,
     /// Char based spans. May incur O(n) lookups
     Char,
