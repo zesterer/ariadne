@@ -223,7 +223,7 @@ pub struct ColorGenerator {
 
 impl Default for ColorGenerator {
     fn default() -> Self {
-        Self::from_state([30000, 15000, 35000], 0.5)
+        Self::new()
     }
 }
 
@@ -231,7 +231,7 @@ impl ColorGenerator {
     /// Create a new [`ColorGenerator`] with the given pre-chosen state.
     ///
     /// The minimum brightness can be used to control the colour brightness (0.0 - 1.0). The default is 0.5.
-    pub fn from_state(state: [u16; 3], min_brightness: f32) -> Self {
+    pub const fn from_state(state: [u16; 3], min_brightness: f32) -> Self {
         Self {
             state,
             min_brightness: min_brightness.max(0.0).min(1.0),
@@ -239,16 +239,19 @@ impl ColorGenerator {
     }
 
     /// Create a new [`ColorGenerator`] with the default state.
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self::from_state([30000, 15000, 35000], 0.5)
     }
 
     /// Generate the next colour in the sequence.
     #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Color {
-        for i in 0..3 {
+    pub const fn next(&mut self) -> Color {
+        // `for i in n..m` not supported in const fn, so workaround that
+        let mut i = 0;
+        while i < 3 {
             // magic constant, one of only two that have this property!
             self.state[i] = (self.state[i] as usize).wrapping_add(40503 * (i * 4 + 1130)) as u16;
+            i += 1;
         }
         Color::Fixed(
             16 + ((self.state[2] as f32 / 65535.0 * (1.0 - self.min_brightness)
@@ -261,5 +264,21 @@ impl ColorGenerator {
                     + self.min_brightness)
                     * 180.0) as u8,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn const_colors() {
+        const COLORS: [Color; 3] = {
+            let mut gen = ColorGenerator::new();
+            [gen.next(), gen.next(), gen.next()]
+        };
+        assert_ne!(COLORS[0], COLORS[1]);
+        assert_ne!(COLORS[1], COLORS[2]);
+        assert_ne!(COLORS[2], COLORS[0]);
     }
 }
