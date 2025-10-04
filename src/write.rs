@@ -241,12 +241,13 @@ impl<S: Span> Report<'_, S> {
             let line_range = src.get_line_range(&char_span);
 
             // File name & reference
-            let location = if src_id == self.span.source() {
-                self.span.start()
+            let (location, index_type) = if src_id == self.span.source() {
+                (self.span.start(), self.config.index_type)
             } else {
-                labels[0].char_span.start
+                // This has already been converted from bytes to chars, if applicable.
+                (labels[0].char_span.start, IndexType::Char)
             };
-            let line_and_col = match self.config.index_type {
+            let line_and_col = match index_type {
                 IndexType::Char => src.get_offset_line(location),
                 IndexType::Byte => src.get_byte_line(location).map(|(line_obj, idx, col)| {
                     let line_text = src.get_line_text(line_obj).unwrap();
