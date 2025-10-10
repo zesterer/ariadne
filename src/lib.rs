@@ -460,6 +460,7 @@ pub struct Config {
     index_type: IndexType,
     minimise_crossings: bool,
     context_lines: usize,
+    show_full: bool,
 }
 
 impl Config {
@@ -545,6 +546,14 @@ impl Config {
         self
     }
 
+    /// Should this report not collapse multiline labels?
+    ///
+    /// If unspecified, this defaults to 'false'
+    pub const fn with_show_full(mut self, show_full: bool) -> Self {
+        self.show_full = show_full;
+        self
+    }
+
     fn error_color(&self) -> Option<Color> {
         Some(Color::Red).filter(|_| self.color)
     }
@@ -597,6 +606,7 @@ impl Config {
             index_type: IndexType::Char,
             minimise_crossings: false,
             context_lines: 0,
+            show_full: false,
         }
     }
 }

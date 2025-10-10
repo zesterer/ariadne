@@ -617,7 +617,7 @@ impl<S: Span> Report<'_, S> {
                     }
                 }
 
-                // Skip this line if we don't have labels for it...
+                // Skip this line if we don't have labels for it and we're not showing the full span...
                 if line_labels.is_empty()
                     && margin_label.is_none()
                     // ...and it does not intersect the display area of any labels
@@ -629,7 +629,9 @@ impl<S: Span> Report<'_, S> {
                     let within_label = multi_labels
                         .iter()
                         .any(|label| label.char_span.contains(&line.span().start()));
-                    if !is_ellipsis && within_label {
+                    if self.config.show_full && within_label {
+                        // Don't skip the line
+                    } else if !is_ellipsis && within_label {
                         is_ellipsis = true;
                     } else {
                         if !self.config.compact && !is_ellipsis {
@@ -1391,6 +1393,29 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn multiline_label_show_full() {
+        let source = "apple\n==\norange";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_show_full(true))
+                .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r"
+        Error:
+           ,-[ <unknown>:1:1 ]
+           |
+         1 | ,-> apple
+         2 | |   ==
+         3 | |-> orange
+           | |
+           | `----------- illegal comparison
+        ---'
+        ");
     }
 
     #[test]
