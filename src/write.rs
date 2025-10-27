@@ -123,7 +123,7 @@ impl<S: Span> Report<'_, S> {
         labels.sort_by_key(|(l, _)| l.display_info.order);
         let mut groups = Vec::<SourceGroup<_>>::new();
         for (label, src_id) in labels {
-            match groups.first_mut() {
+            match groups.last_mut() {
                 Some(group)
                     if group.src_id == src_id
                         && group
@@ -1594,21 +1594,22 @@ mod tests {
         let msg = remove_trailing(
             Report::build(ReportKind::Error, ("", 0..0))
                 .with_config(no_color_and_ascii())
-                .with_label(Label::new(("b", 7..12)).with_order(0).with_message("1"))
-                .with_label(Label::new(("a", 0..6)).with_order(1).with_message("2"))
-                .with_label(Label::new(("a", 7..12)).with_order(1).with_message("3"))
-                .with_label(Label::new(("b", 0..6)).with_order(1).with_message("4"))
+                .with_label(Label::new(("b", 13..18)).with_order(1).with_message("1"))
+                .with_label(Label::new(("a", 0..6)).with_order(2).with_message("2"))
+                .with_label(Label::new(("a", 7..12)).with_order(3).with_message("3"))
+                .with_label(Label::new(("b", 0..6)).with_order(4).with_message("4"))
+                .with_label(Label::new(("b", 7..12)).with_order(5).with_message("5"))
                 .finish()
                 .write_to_string(crate::sources([
                     ("a", "second\nthird"),
-                    ("b", "fourth\nfirst"),
+                    ("b", "fourth\nfifth\nfirst"),
                 ])),
         );
         assert_snapshot!(msg, @r###"
         Error:
-           ,-[ b:2:1 ]
+           ,-[ b:3:1 ]
            |
-         2 | first
+         3 | first
            | ^^|^^
            |   `---- 1
            |
@@ -1617,9 +1618,6 @@ mod tests {
          1 | second
            | ^^^|^^
            |    `---- 2
-           |
-           |-[ a:2:1 ]
-           |
          2 | third
            | ^^|^^
            |   `---- 3
@@ -1629,6 +1627,9 @@ mod tests {
          1 | fourth
            | ^^^|^^
            |    `---- 4
+         2 | fifth
+           | ^^|^^
+           |   `---- 5
         ---'
         "###)
     }
