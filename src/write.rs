@@ -23,6 +23,7 @@ struct LabelInfo<'a> {
     kind: LabelKind,
     char_span: Range<usize>,
     display_info: &'a LabelDisplay,
+    line: usize,
 }
 
 impl<'a> LabelInfo<'a> {
@@ -42,7 +43,7 @@ struct SourceGroup<'a, S: Span> {
 
 impl<S: Span> Report<'_, S> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
-        let mut groups = Vec::new();
+        let mut labels = Vec::new();
         for label in self.labels.iter() {
             let label_source = label.span.source();
 
@@ -114,21 +115,33 @@ impl<S: Span> Report<'_, S> {
                 },
                 char_span: label_char_span,
                 display_info: &label.display_info,
+                line: end_line,
             };
 
-            if let Some(group) = groups
-                .iter_mut()
-                .find(|g: &&mut SourceGroup<S>| g.src_id == label_source)
-            {
-                group.char_span.start = group.char_span.start.min(label_info.char_span.start);
-                group.char_span.end = group.char_span.end.max(label_info.char_span.end);
-                group.labels.push(label_info);
-            } else {
-                groups.push(SourceGroup {
-                    src_id: label_source,
-                    char_span: label_info.char_span.clone(),
-                    labels: vec![label_info],
-                });
+            labels.push((label_info, label_source));
+        }
+        labels.sort_by_key(|(l, _)| l.display_info.order);
+        let mut groups = Vec::<SourceGroup<_>>::new();
+        for (label, src_id) in labels {
+            match groups.first_mut() {
+                Some(group)
+                    if group.src_id == src_id
+                        && group
+                            .labels
+                            .last()
+                            .map_or(true, |last| last.line <= label.line) =>
+                {
+                    group.char_span.start = group.char_span.start.min(label.char_span.start);
+                    group.char_span.end = group.char_span.end.max(label.char_span.end);
+                    group.labels.push(label);
+                }
+                _ => {
+                    groups.push(SourceGroup {
+                        src_id: src_id,
+                        char_span: label.char_span.clone(),
+                        labels: vec![label],
+                    });
+                }
             }
         }
         groups
@@ -1572,6 +1585,50 @@ mod tests {
            |
            | Help 2: Yeah, really, please stop.
            |         It has no resemblance.
+        ---'
+        "###)
+    }
+
+    #[test]
+    fn ordered_labels() {
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, ("", 0..0))
+                .with_config(no_color_and_ascii())
+                .with_label(Label::new(("b", 7..12)).with_order(0).with_message("1"))
+                .with_label(Label::new(("a", 0..6)).with_order(1).with_message("2"))
+                .with_label(Label::new(("a", 7..12)).with_order(1).with_message("3"))
+                .with_label(Label::new(("b", 0..6)).with_order(1).with_message("4"))
+                .finish()
+                .write_to_string(crate::sources([
+                    ("a", "second\nthird"),
+                    ("b", "fourth\nfirst"),
+                ])),
+        );
+        assert_snapshot!(msg, @r###"
+        Error:
+           ,-[ b:2:1 ]
+           |
+         2 | first
+           | ^^|^^
+           |   `---- 1
+           |
+           |-[ a:1:1 ]
+           |
+         1 | second
+           | ^^^|^^
+           |    `---- 2
+           |
+           |-[ a:2:1 ]
+           |
+         2 | third
+           | ^^|^^
+           |   `---- 3
+           |
+           |-[ b:1:1 ]
+           |
+         1 | fourth
+           | ^^^|^^
+           |    `---- 4
         ---'
         "###)
     }
