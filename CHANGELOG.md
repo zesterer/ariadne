@@ -17,6 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+# [0.6.0] - 2025-10-28
+
+### Added
+
+- Support for multiple help hints
+- Support for multi-line help hints
+- Implemented `Cache` for `&Source`
+
+### Changed
+
+- The Minimum Supported Rust Version (MSRV) is now 1.85.0
+- Label ordering is now respected across multiple source files
+- `ColorGenerator` is now usable in const contexts
+- File references now have spaces, improving support for terminal emulator click-through
+
 # [0.5.1] - 2025-03-13
 
 ### Added

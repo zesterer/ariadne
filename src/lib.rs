@@ -169,14 +169,14 @@ impl<S: Span> Label<S> {
 
     /// Specify the order of this label relative to other labels.
     ///
-    /// Lower values correspond to this label having an earlier order.
+    /// Lower values correspond to this label having an earlier order. Labels with the same order will be arranged
+    /// in whatever order best suits their spans and layout constraints.
     ///
     /// If unspecified, labels default to an order of `0`.
     ///
-    /// When labels are displayed after a line the crate needs to decide which labels should be displayed first. By
-    /// Default, the orders labels based on where their associated line meets the text (see [`LabelAttach`]).
-    /// Additionally, multi-line labels are ordered before inline labels. You can use this function to override this
-    /// behaviour.
+    /// Label order is respected across files. If labels that appear earlier in a file have an order that requires
+    /// them to appear later, the resulting diagnostic may result in multiple instances of the same file being
+    /// displayed.
     pub fn with_order(mut self, order: i32) -> Self {
         self.display_info.order = order;
         self
