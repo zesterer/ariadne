@@ -1397,11 +1397,11 @@ mod tests {
 
     #[test]
     fn multiline_label_show_full() {
-        let source = "apple\n==\norange";
+        let source = "pear\napple\n==\norange\nbanana";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
                 .with_config(no_color_and_ascii().with_show_full(true))
-                .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
+                .with_label(Label::new(5..20).with_message("illegal comparison"))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
@@ -1409,11 +1409,11 @@ mod tests {
         Error:
            ,-[ <unknown>:1:1 ]
            |
-         1 | ,-> apple
-         2 | |   ==
-         3 | |-> orange
+         2 | ,-> apple
+         3 | |   ==
+         4 | |-> orange
            | |
-           | `----------- illegal comparison
+           | `------------ illegal comparison
         ---'
         ");
     }
