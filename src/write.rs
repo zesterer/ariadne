@@ -245,6 +245,8 @@ impl<S: Span> Report<'_, S> {
                 }
             };
 
+            let line_count = ExactSizeIterator::len(&display_range);
+
             // File name & reference
             let (location, index_type) = if src_id == self.span.source() {
                 (self.span.start(), self.config.index_type)
@@ -617,19 +619,22 @@ impl<S: Span> Report<'_, S> {
                     }
                 }
 
-                // Skip this line if we don't have labels for it and we're not showing the full span...
+                let skip_lines = !self.config.show_full_span
+                    && line_count > self.config.max_span_line_count_shown;
+                // Skip this line if we don't have labels for it, we're not showing the full span, and the line isn't part of the context
                 if line_labels.is_empty()
                     && margin_label.is_none()
-                    // ...and it does not intersect the display area of any labels
                     && labels.iter().all(|l| {
-                        (l.start_line as isize - idx as isize).abs()
-                            .min((l.end_line as isize - idx as isize).abs()) > self.config.context_lines as isize
+                        (l.start_line as isize - idx as isize)
+                            .abs()
+                            .min((l.end_line as isize - idx as isize).abs())
+                            > self.config.context_lines as isize
                     })
                 {
                     let within_label = multi_labels
                         .iter()
                         .any(|label| label.char_span.contains(&line.span().start()));
-                    if self.config.show_full_span && within_label {
+                    if !skip_lines && within_label {
                         // Don't skip the line
                     } else if !is_ellipsis && within_label {
                         is_ellipsis = true;
@@ -1414,6 +1419,52 @@ mod tests {
          4 | |-> orange
            | |
            | `------------ illegal comparison
+        ---'
+        ");
+    }
+
+    #[test]
+    fn multiline_label_show_3() {
+        let source = "pear\napple\n==\norange\nbanana";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_max_span_line_count_shown(3))
+                .with_label(Label::new(5..20).with_message("illegal comparison"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r"
+        Error:
+           ,-[ <unknown>:1:1 ]
+           |
+         2 | ,-> apple
+         3 | |   ==
+         4 | |-> orange
+           | |
+           | `------------ illegal comparison
+        ---'
+        ");
+    }
+
+    #[test]
+    fn multiline_label_longer_than_max_span_line_count() {
+        let source = "pear\napple\n==\norange\nbanana";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_max_span_line_count_shown(3))
+                .with_label(Label::new(5..source.len()).with_message("illegal comparison"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r"
+        Error:
+           ,-[ <unknown>:1:1 ]
+           |
+         2 | ,-> apple
+           : :
+         5 | |-> banana
+           | |
+           | `----------- illegal comparison
         ---'
         ");
     }

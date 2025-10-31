@@ -461,6 +461,7 @@ pub struct Config {
     minimise_crossings: bool,
     context_lines: usize,
     show_full: bool,
+    max_span_line_count_shown: usize,
     show_full_span: bool,
 }
 
@@ -547,7 +548,18 @@ impl Config {
         self
     }
 
+    /// How many lines can be shown in a multi-line span before hiding lines with ellipses.
+    ///
+    /// Ignored if `show_full_span` is `true`.
+    ///
+     /// If unspecified, this defaults to `2`
+    pub const fn with_max_span_line_count_shown(mut self, max_span_line_count_shown: usize) -> Self {
+        self.max_span_line_count_shown = max_span_line_count_shown;
+        self
+    }
     /// Whether all lines covered by a multi-line span are shown, instead of just the first and last lines.
+    ///
+    /// Overrides length given for `max_span_line_count_shown`.
     ///
     /// If unspecified, this defaults to 'false'
     pub const fn with_show_full_span(mut self, show_full_span: bool) -> Self {
@@ -608,6 +620,7 @@ impl Config {
             minimise_crossings: false,
             context_lines: 0,
             show_full: false,
+            max_span_line_count_shown: 2,
             show_full_span: false,
         }
     }
