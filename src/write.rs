@@ -629,7 +629,7 @@ impl<S: Span> Report<'_, S> {
                     let within_label = multi_labels
                         .iter()
                         .any(|label| label.char_span.contains(&line.span().start()));
-                    if self.config.show_full && within_label {
+                    if self.config.show_full_span && within_label {
                         // Don't skip the line
                     } else if !is_ellipsis && within_label {
                         is_ellipsis = true;
@@ -1400,7 +1400,7 @@ mod tests {
         let source = "pear\napple\n==\norange\nbanana";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_show_full(true))
+                .with_config(no_color_and_ascii().with_show_full_span(true))
                 .with_label(Label::new(5..20).with_message("illegal comparison"))
                 .finish()
                 .write_to_string(Source::from(source)),
