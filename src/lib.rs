@@ -198,6 +198,7 @@ impl<S: Span> Label<S> {
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
+#[must_use = "call `.print()` or `.eprint()` to print the report"]
 pub struct Report<'a, S: Span = Range<usize>> {
     kind: ReportKind<'a>,
     code: Option<String>,
@@ -279,6 +280,7 @@ impl fmt::Display for ReportKind<'_> {
 }
 
 /// A type used to build a [`Report`].
+#[must_use = "call `.finish()` to obtain a `Report`"]
 pub struct ReportBuilder<'a, S: Span> {
     kind: ReportKind<'a>,
     code: Option<String>,
