@@ -552,8 +552,11 @@ impl Config {
     ///
     /// Ignored if `show_full_span` is `true`.
     ///
-     /// If unspecified, this defaults to `2`
-    pub const fn with_max_span_line_count_shown(mut self, max_span_line_count_shown: usize) -> Self {
+    /// If unspecified, this defaults to `2`
+    pub const fn with_max_span_line_count_shown(
+        mut self,
+        max_span_line_count_shown: usize,
+    ) -> Self {
         self.max_span_line_count_shown = max_span_line_count_shown;
         self
     }
