@@ -455,6 +455,8 @@ pub struct Config {
     tab_width: usize,
     char_set: CharSet,
     index_type: IndexType,
+    max_span_line_count_shown: usize,
+    show_full_span: bool,
 }
 
 impl Config {
@@ -523,6 +525,27 @@ impl Config {
         self.index_type = index_type;
         self
     }
+    /// How many lines can be shown in a multi-line span before hiding lines with ellipses.
+    ///
+    /// Ignored if `show_full_span` is `true`.
+    ///
+    /// If unspecified, this defaults to `2`
+    pub const fn with_max_span_line_count_shown(
+        mut self,
+        max_span_line_count_shown: usize,
+    ) -> Self {
+        self.max_span_line_count_shown = max_span_line_count_shown;
+        self
+    }
+    /// Whether all lines covered by a multi-line span are shown, instead of just the first and last lines.
+    ///
+    /// Overrides length given for `max_span_line_count_shown`.
+    ///
+    /// If unspecified, this defaults to 'false'
+    pub const fn with_show_full_span(mut self, show_full_span: bool) -> Self {
+        self.show_full_span = show_full_span;
+        self
+    }
 
     fn error_color(&self) -> Option<Color> {
         Some(Color::Red).filter(|_| self.color)
@@ -574,6 +597,8 @@ impl Config {
             tab_width: 4,
             char_set: CharSet::Unicode,
             index_type: IndexType::Char,
+            max_span_line_count_shown: 2,
+            show_full_span: false,
         }
     }
 }
