@@ -18,12 +18,12 @@ fn main() {
                 .with_color(a),
         )
         .with_label(
-            Label::new(("sample.tao", 42..45))
+            Label::new(("sample.tao", 52..55))
                 .with_message(format!("This is of type {}", "Str".fg(b)))
                 .with_color(b),
         )
         .with_label(
-            Label::new(("sample.tao", 11..48))
+            Label::new(("sample.tao", 11..58))
                 .with_message(format!(
                     "The values are outputs of this {} expression",
                     "match".fg(out),
@@ -31,12 +31,12 @@ fn main() {
                 .with_color(out),
         )
         .with_label(
-            Label::new(("sample.tao", 0..48))
+            Label::new(("sample.tao", 0..58))
                 .with_message(format!("The {} has a problem", "definition".fg(out2),))
                 .with_color(out2),
         )
         .with_label(
-            Label::new(("sample.tao", 50..76))
+            Label::new(("sample.tao", 60..86))
                 .with_message(format!("Usage of {} here", "definition".fg(out2),))
                 .with_color(out2),
         )

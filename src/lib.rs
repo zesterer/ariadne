@@ -458,6 +458,7 @@ pub struct Config {
     char_set: CharSet,
     index_type: IndexType,
     minimise_crossings: bool,
+    context_lines: usize,
 }
 
 impl Config {
@@ -521,7 +522,7 @@ impl Config {
     }
     /// Should this report use byte spans instead of char spans?
     ///
-    /// If unspecified, this defaults to 'false'
+    /// If unspecified, this defaults to [`false`].
     pub const fn with_index_type(mut self, index_type: IndexType) -> Self {
         self.index_type = index_type;
         self
@@ -530,9 +531,16 @@ impl Config {
     ///
     /// Note that label order overridden via [`Label::with_order`] will still be respected.
     ///
-    /// If unspecified, this defaults to 'false'
+    /// If unspecified, this defaults to [`false`].
     pub const fn with_minimise_crossings(mut self, minimise_crossings: bool) -> Self {
         self.minimise_crossings = minimise_crossings;
+        self
+    }
+    /// How many lines of extra context should be displayed around the start and end of labels?
+    ///
+    /// If unspecified, this defaults to `0`.
+    pub const fn with_context_lines(mut self, context_lines: usize) -> Self {
+        self.context_lines = context_lines;
         self
     }
 
@@ -587,6 +595,7 @@ impl Config {
             char_set: CharSet::Unicode,
             index_type: IndexType::Char,
             minimise_crossings: false,
+            context_lines: 0,
         }
     }
 }

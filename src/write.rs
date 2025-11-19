@@ -1,7 +1,7 @@
 use std::io;
 use std::ops::Range;
 
-use crate::{IndexType, LabelDisplay};
+use crate::{Config, IndexType, LabelDisplay};
 
 use super::draw::{self, StreamAwareFmt, StreamType};
 use super::{Cache, CharSet, LabelAttach, Report, ReportKind, Show, Span, Write};
@@ -35,11 +35,17 @@ impl LabelInfo<'_> {
             .saturating_sub(1)
             .max(self.char_span.start)
     }
+
+    fn display_range(&self, config: &Config) -> Range<usize> {
+        self.start_line.saturating_sub(config.context_lines)
+            ..self.end_line + config.context_lines + 1
+    }
 }
 
 struct SourceGroup<'a, S: Span> {
     src_id: &'a S::SourceId,
     char_span: Range<usize>,
+    display_range: Range<usize>,
     labels: Vec<LabelInfo<'a>>,
 }
 
@@ -52,8 +58,8 @@ impl<S: Span> Report<'_, S> {
             let src_display = cache.display(label_source);
             let src = match cache.fetch(label_source) {
                 Ok(src) => src,
-                Err(e) => {
-                    eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), e);
+                Err(err) => {
+                    eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), err);
                     continue;
                 }
             };
@@ -136,12 +142,16 @@ impl<S: Span> Report<'_, S> {
                 {
                     group.char_span.start = group.char_span.start.min(label.char_span.start);
                     group.char_span.end = group.char_span.end.max(label.char_span.end);
+                    let display_range = label.display_range(&self.config);
+                    group.display_range.start = group.display_range.start.min(display_range.start);
+                    group.display_range.end = group.display_range.end.max(display_range.end);
                     group.labels.push(label);
                 }
                 _ => {
                     groups.push(SourceGroup {
                         src_id,
                         char_span: label.char_span.clone(),
+                        display_range: label.display_range(&self.config),
                         labels: vec![label],
                     });
                 }
@@ -200,33 +210,13 @@ impl<S: Span> Report<'_, S> {
         // Line number maximum width
         let line_no_width = groups
             .iter()
-            .filter_map(
-                |SourceGroup {
-                     char_span, src_id, ..
-                 }| {
-                    let src_name = cache
-                        .display(src_id)
-                        .map(|d| d.to_string())
-                        .unwrap_or_else(|| "<unknown>".to_string());
-
-                    let src = match cache.fetch(src_id) {
-                        Ok(src) => src,
-                        Err(err) => {
-                            eprintln!("Unable to fetch source {src_name}: {err:?}");
-                            return None;
-                        }
-                    };
-
-                    let line_range = src.get_line_range(char_span);
-                    Some(
-                        (1..)
-                            .map(|x| 10u32.pow(x))
-                            .take_while(|x| line_range.end as u32 / x != 0)
-                            .count()
-                            + 1,
-                    )
-                },
-            )
+            .map(|g| {
+                (1..)
+                    .map(|x| 10u32.pow(x))
+                    .take_while(|x| g.display_range.end as u32 / x != 0)
+                    .count()
+                    + 1
+            })
             .max()
             .unwrap_or(0);
 
@@ -236,8 +226,9 @@ impl<S: Span> Report<'_, S> {
             group_idx,
             SourceGroup {
                 src_id,
-                char_span,
+                display_range,
                 labels,
+                ..
             },
         ) in groups.into_iter().enumerate()
         {
@@ -253,8 +244,6 @@ impl<S: Span> Report<'_, S> {
                     continue;
                 }
             };
-
-            let line_range = src.get_line_range(&char_span);
 
             // File name & reference
             let (location, index_type) = if src_id == self.span.source() {
@@ -409,7 +398,7 @@ impl<S: Span> Report<'_, S> {
                                 .as_ref()
                                 .filter(|m| std::ptr::eq(*label, m.label));
 
-                            if label.char_span.start <= line_span.end
+                            if label.char_span.start < line_span.end
                                 && label.char_span.end > line_span.start
                             {
                                 let is_parent = i != col;
@@ -529,7 +518,7 @@ impl<S: Span> Report<'_, S> {
             };
 
             let mut is_ellipsis = false;
-            for idx in line_range {
+            for idx in display_range {
                 let line = if let Some(line) = src.line(idx) {
                     line
                 } else {
@@ -616,8 +605,15 @@ impl<S: Span> Report<'_, S> {
                     }
                 }
 
-                // Skip this line if we don't have labels for it
-                if line_labels.is_empty() && margin_label.is_none() {
+                // Skip this line if we don't have labels for it...
+                if line_labels.is_empty()
+                    && margin_label.is_none()
+                    // ...and it does not intersect the display area of any labels
+                    && labels.iter().all(|l| {
+                        (l.start_line as isize - idx as isize).abs()
+                            .min((l.end_line as isize - idx as isize).abs()) > self.config.context_lines as isize
+                    })
+                {
                     let within_label = multi_labels
                         .iter()
                         .any(|label| label.char_span.contains(&line.span().start()));
@@ -1356,6 +1352,32 @@ mod tests {
          3 | |-> orange
            | |
            | `----------- illegal comparison
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn multiline_context_label() {
+        let source = "apple\nbanana\ncarrot\ndragonfruit\negg\nfruit\ngrapes";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_context_lines(1))
+                .with_label(Label::new(13..35).with_message("illegal comparison"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        // TODO: it would be nice if the 2nd line wasn't omitted
+        assert_snapshot!(msg, @r###"
+        Error:
+           ,-[ <unknown>:1:1 ]
+           |
+         2 |     banana
+         3 | ,-> carrot
+         4 | |   dragonfruit
+         5 | |-> egg
+           | |
+           | `--------- illegal comparison
+         6 |     fruit
         ---'
         "###);
     }
