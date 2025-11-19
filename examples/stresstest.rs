@@ -216,7 +216,8 @@ fn main() {
                 .with_cross_gap(false)
                 .with_compact(true)
                 .with_underlines(true)
-                .with_tab_width(4),
+                .with_tab_width(4)
+                .with_minimise_crossings(true),
         )
         .finish()
         .print((

@@ -23,7 +23,8 @@ struct LabelInfo<'a> {
     kind: LabelKind,
     char_span: Range<usize>,
     display_info: &'a LabelDisplay,
-    line: usize,
+    start_line: usize,
+    end_line: usize,
 }
 
 impl<'a> LabelInfo<'a> {
@@ -115,7 +116,8 @@ impl<S: Span> Report<'_, S> {
                 },
                 char_span: label_char_span,
                 display_info: &label.display_info,
-                line: end_line,
+                start_line,
+                end_line,
             };
 
             labels.push((label_info, label_source));
@@ -129,7 +131,7 @@ impl<S: Span> Report<'_, S> {
                         && group
                             .labels
                             .last()
-                            .map_or(true, |last| last.line <= label.line) =>
+                            .map_or(true, |last| last.end_line <= label.end_line) =>
                 {
                     group.char_span.start = group.char_span.start.min(label.char_span.start);
                     group.char_span.end = group.char_span.end.max(label.char_span.end);
@@ -307,7 +309,7 @@ impl<S: Span> Report<'_, S> {
             struct LineLabel<'a> {
                 col: usize,
                 label: &'a LabelInfo<'a>,
-                multi: bool,
+                multi: Option<usize>,
                 draw_msg: bool,
             }
 
@@ -325,7 +327,26 @@ impl<S: Span> Report<'_, S> {
 
             // Sort multiline labels by length
             multi_labels.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
-            multi_labels_with_message.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
+            if self.config.minimise_crossings {
+                // There is no total ordering to labels, so just spin around a bunch rearranging labels making tiny improvements
+                // Crap bubble sort, basically
+                for i in (0..multi_labels_with_message.len().saturating_sub(1))
+                    .cycle()
+                    .take(multi_labels_with_message.len().pow(2) * 2)
+                {
+                    let a = &multi_labels_with_message[i];
+                    let b = &multi_labels_with_message[i + 1];
+                    let pro_a = (a.char_span.start < b.char_span.start) as i32
+                        + (a.char_span.end > b.char_span.end) as i32;
+                    let pro_b = (b.char_span.start < a.char_span.start) as i32
+                        + (b.char_span.end > a.char_span.end) as i32;
+                    if pro_a < pro_b {
+                        multi_labels_with_message.swap(i, i + 1);
+                    }
+                }
+            } else {
+                multi_labels_with_message.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
+            }
 
             let write_margin = |w: &mut W,
                                 idx: usize,
@@ -452,7 +473,7 @@ impl<S: Span> Report<'_, S> {
                                 draw.hbar.fg(label.display_info.color, s),
                             )
                         } else if let Some(label) =
-                            hbar.filter(|_| vbar.is_some() && !self.config.cross_gap)
+                            vbar.filter(|_| hbar.is_some() && !self.config.cross_gap)
                         {
                             (
                                 draw.xbar.fg(label.display_info.color, s),
@@ -517,7 +538,7 @@ impl<S: Span> Report<'_, S> {
                 let margin_label = multi_labels_with_message
                     .iter()
                     .enumerate()
-                    .filter_map(|(_i, label)| {
+                    .filter_map(|(i, label)| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start {
@@ -525,14 +546,14 @@ impl<S: Span> Report<'_, S> {
                             Some(LineLabel {
                                 col: label.char_span.start - line.offset(),
                                 label,
-                                multi: true,
+                                multi: Some(i),
                                 draw_msg: false, // Multi-line spans don;t have their messages drawn at the start
                             })
                         } else if is_end {
                             Some(LineLabel {
                                 col: label.last_offset() - line.offset(),
                                 label,
-                                multi: true,
+                                multi: Some(i),
                                 draw_msg: true, // Multi-line spans have their messages drawn at the end
                             })
                         } else {
@@ -545,7 +566,7 @@ impl<S: Span> Report<'_, S> {
                 let mut line_labels = multi_labels_with_message
                     .iter()
                     .enumerate()
-                    .filter_map(|(_i, label)| {
+                    .filter_map(|(i, label)| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start
@@ -557,14 +578,14 @@ impl<S: Span> Report<'_, S> {
                             Some(LineLabel {
                                 col: label.char_span.start - line.offset(),
                                 label,
-                                multi: true,
-                                draw_msg: false, // Multi-line spans don;t have their messages drawn at the start
+                                multi: Some(i),
+                                draw_msg: false, // Multi-line spans don't have their messages drawn at the start
                             })
                         } else if is_end {
                             Some(LineLabel {
                                 col: label.last_offset() - line.offset(),
                                 label,
-                                multi: true,
+                                multi: Some(i),
                                 draw_msg: true, // Multi-line spans have their messages drawn at the end
                             })
                         } else {
@@ -588,7 +609,7 @@ impl<S: Span> Report<'_, S> {
                             .max(label_info.char_span.start)
                                 - line.offset(),
                             label: label_info,
-                            multi: false,
+                            multi: None,
                             draw_msg: true,
                         });
                     }
@@ -617,7 +638,17 @@ impl<S: Span> Report<'_, S> {
                 line_labels.sort_by_key(|ll| {
                     (
                         ll.label.display_info.order,
-                        ll.col,
+                        // `draw_msg = true` means that this is the end of the label
+                        if self.config.minimise_crossings {
+                            ll.multi.map(|i| if ll.draw_msg { !i } else { i })
+                        } else {
+                            None
+                        },
+                        if self.config.minimise_crossings ^ ll.draw_msg {
+                            ll.col
+                        } else {
+                            !ll.col
+                        },
                         !ll.label.char_span.start,
                     )
                 });
@@ -625,7 +656,7 @@ impl<S: Span> Report<'_, S> {
                 // Determine label bounds so we know where to put error messages
                 let arrow_end_space = if self.config.compact { 1 } else { 2 };
                 let arrow_len = line_labels.iter().fold(0, |l, ll| {
-                    if ll.multi {
+                    if ll.multi.is_some() {
                         line.len()
                     } else {
                         l.max(ll.label.char_span.end().saturating_sub(line.offset()))
@@ -670,7 +701,7 @@ impl<S: Span> Report<'_, S> {
                         .filter(|ll| {
                             self.config.underlines
                         // Underlines only occur for inline spans (highlighting can occur for all spans)
-                        && !ll.multi
+                        && ll.multi.is_none()
                         && ll.label.char_span.contains(&(line.offset() + col))
                         })
                         // Prioritise displaying smaller spans
@@ -763,7 +794,9 @@ impl<S: Span> Report<'_, S> {
                                     } else {
                                         [draw.underbar, draw.underline]
                                     }
-                                } else if vbar_ll.multi && row == 0 && self.config.multiline_arrows
+                                } else if vbar_ll.multi.is_some()
+                                    && row == 0
+                                    && self.config.multiline_arrows
                                 {
                                     [draw.uarrow, ' ']
                                 } else {
@@ -802,7 +835,7 @@ impl<S: Span> Report<'_, S> {
                     for col in 0..arrow_len {
                         let width = chars.next().map_or(1, |c| self.config.char_width(c, col).1);
 
-                        let is_hbar = (((col > line_label.col) ^ line_label.multi)
+                        let is_hbar = (((col > line_label.col) ^ line_label.multi.is_some())
                             || (line_label.label.display_info.msg.is_some()
                                 && line_label.draw_msg
                                 && col > line_label.col))
@@ -814,7 +847,7 @@ impl<S: Span> Report<'_, S> {
                                 .map_or(true, |m| !std::ptr::eq(line_label.label, m.label))
                         {
                             [
-                                if line_label.multi {
+                                if line_label.multi.is_some() {
                                     if line_label.draw_msg {
                                         draw.mbot
                                     } else {
@@ -831,14 +864,14 @@ impl<S: Span> Report<'_, S> {
                         }) {
                             if !self.config.cross_gap && is_hbar {
                                 [
-                                    draw.xbar.fg(line_label.label.display_info.color, s),
+                                    draw.xbar.fg(vbar_ll.label.display_info.color, s),
                                     ' '.fg(line_label.label.display_info.color, s),
                                 ]
                             } else if is_hbar {
                                 [draw.hbar.fg(line_label.label.display_info.color, s); 2]
                             } else {
                                 [
-                                    if vbar_ll.multi && row == 0 && self.config.compact {
+                                    if vbar_ll.multi.is_some() && row == 0 && self.config.compact {
                                         draw.uarrow
                                     } else {
                                         draw.vbar
@@ -1631,6 +1664,40 @@ mod tests {
          2 | fifth
            | ^^|^^
            |   `---- 5
+        ---'
+        "###)
+    }
+
+    #[test]
+    fn minimise_crossings() {
+        let source = "begin\napple == orange;\nend";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_minimise_crossings(true))
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(6..11).with_message("This is an apple"))
+                .with_label(Label::new(15..21).with_message("This is an orange"))
+                .with_label(Label::new(3..25).with_message("multi 1"))
+                .with_label(Label::new(25..26).with_message("single"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        eprintln!("{msg}");
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[ <unknown>:1:1 ]
+           |
+         1 | ,-> begin
+         2 | |   apple == orange;
+           | |   ^^|^^    ^^^|^^
+           | |     |         `---- This is an orange
+           | |     |
+           | |     `-------------- This is an apple
+         3 | |-> end
+           | |     |
+           | |     `-- single
+           | |
+           | `-------- multi 1
         ---'
         "###)
     }

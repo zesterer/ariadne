@@ -455,6 +455,7 @@ pub struct Config {
     tab_width: usize,
     char_set: CharSet,
     index_type: IndexType,
+    minimise_crossings: bool,
 }
 
 impl Config {
@@ -523,6 +524,15 @@ impl Config {
         self.index_type = index_type;
         self
     }
+    /// Should label crossings be minimised rather than prioritising label ordering?
+    ///
+    /// Note that label order overridden via [`Label::with_order`] will still be respected.
+    ///
+    /// If unspecified, this defaults to 'false'
+    pub const fn with_minimise_crossings(mut self, minimise_crossings: bool) -> Self {
+        self.minimise_crossings = minimise_crossings;
+        self
+    }
 
     fn error_color(&self) -> Option<Color> {
         Some(Color::Red).filter(|_| self.color)
@@ -574,6 +584,7 @@ impl Config {
             tab_width: 4,
             char_set: CharSet::Unicode,
             index_type: IndexType::Char,
+            minimise_crossings: false,
         }
     }
 }
