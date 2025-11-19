@@ -23,11 +23,12 @@ struct LabelInfo<'a> {
     kind: LabelKind,
     char_span: Range<usize>,
     display_info: &'a LabelDisplay,
+    #[allow(dead_code)]
     start_line: usize,
     end_line: usize,
 }
 
-impl<'a> LabelInfo<'a> {
+impl LabelInfo<'_> {
     fn last_offset(&self) -> usize {
         self.char_span
             .end
@@ -139,7 +140,7 @@ impl<S: Span> Report<'_, S> {
                 }
                 _ => {
                     groups.push(SourceGroup {
-                        src_id: src_id,
+                        src_id,
                         char_span: label.char_span.clone(),
                         labels: vec![label],
                     });
@@ -184,7 +185,7 @@ impl<S: Span> Report<'_, S> {
 
         // --- Header ---
 
-        let code = self.code.as_ref().map(|c| format!("[{}] ", c));
+        let code = self.code.as_ref().map(|c| format!("[{c}] "));
         let id = format!("{}{}:", Show(code), self.kind);
         let kind_color = match self.kind {
             ReportKind::Error => self.config.error_color(),
@@ -210,8 +211,8 @@ impl<S: Span> Report<'_, S> {
 
                     let src = match cache.fetch(src_id) {
                         Ok(src) => src,
-                        Err(e) => {
-                            eprintln!("Unable to fetch source {}: {:?}", src_name, e);
+                        Err(err) => {
+                            eprintln!("Unable to fetch source {src_name}: {err:?}");
                             return None;
                         }
                     };
@@ -247,8 +248,8 @@ impl<S: Span> Report<'_, S> {
 
             let src = match cache.fetch(src_id) {
                 Ok(src) => src,
-                Err(e) => {
-                    eprintln!("Unable to fetch source {}: {:?}", src_name, e);
+                Err(err) => {
+                    eprintln!("Unable to fetch source {src_name}: {err:?}");
                     continue;
                 }
             };
@@ -280,7 +281,7 @@ impl<S: Span> Report<'_, S> {
                     )
                 })
                 .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
-            let line_ref = format!("{}:{}:{}", src_name, line_no, col_no);
+            let line_ref = format!("{src_name}:{line_no}:{col_no}");
             writeln!(
                 w,
                 "{}{}{}{} {} {}",
@@ -517,9 +518,9 @@ impl<S: Span> Report<'_, S> {
                         } else {
                             (' '.fg(None, s), ' '.fg(None, s))
                         };
-                        write!(w, "{}", a)?;
+                        write!(w, "{a}")?;
                         if !self.config.compact {
-                            write!(w, "{}", b)?;
+                            write!(w, "{b}")?;
                         }
                     }
                 }
@@ -887,10 +888,10 @@ impl<S: Span> Report<'_, S> {
                         };
 
                         if width > 0 {
-                            write!(w, "{}", c)?;
+                            write!(w, "{c}")?;
                         }
                         for _ in 1..width {
-                            write!(w, "{}", tail)?;
+                            write!(w, "{tail}")?;
                         }
                     }
                     if line_label.draw_msg {

@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
+// Silly diagnostic anyway
+#![allow(clippy::unnecessary_map_or)]
 
 mod display;
 mod draw;
@@ -240,7 +242,7 @@ impl<S: Span> Report<'_, S> {
     }
 }
 
-impl<'a, S: Span> fmt::Debug for Report<'a, S> {
+impl<S: Span> fmt::Debug for Report<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Report")
             .field("kind", &self.kind)
@@ -273,7 +275,7 @@ impl fmt::Display for ReportKind<'_> {
             ReportKind::Error => write!(f, "Error"),
             ReportKind::Warning => write!(f, "Warning"),
             ReportKind::Advice => write!(f, "Advice"),
-            ReportKind::Custom(s, _) => write!(f, "{}", s),
+            ReportKind::Custom(s, _) => write!(f, "{s}"),
         }
     }
 }
@@ -293,7 +295,7 @@ pub struct ReportBuilder<'a, S: Span> {
 impl<'a, S: Span> ReportBuilder<'a, S> {
     /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
     pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
-        self.code = Some(format!("{:02}", code));
+        self.code = Some(format!("{code:02}"));
         self
     }
 
@@ -401,7 +403,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     }
 }
 
-impl<'a, S: Span> fmt::Debug for ReportBuilder<'a, S> {
+impl<S: Span> fmt::Debug for ReportBuilder<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)

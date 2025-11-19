@@ -25,7 +25,7 @@ pub trait Cache<Id: ?Sized> {
     fn display<'a>(&self, id: &'a Id) -> Option<impl fmt::Display + 'a>;
 }
 
-impl<'b, C: Cache<Id>, Id: ?Sized> Cache<Id> for &'b mut C {
+impl<C: Cache<Id>, Id: ?Sized> Cache<Id> for &mut C {
     type Storage = C::Storage;
 
     fn fetch(&mut self, id: &Id) -> Result<&Source<Self::Storage>, impl fmt::Debug> {
@@ -296,7 +296,7 @@ impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, Source<I>) {
         if id == &self.0 {
             Ok(&self.1)
         } else {
-            Err(Box::new(format!("Failed to fetch source '{}'", id)))
+            Err(Box::new(format!("Failed to fetch source '{id}'")))
         }
     }
     fn display<'a>(&self, id: &'a Id) -> Option<impl fmt::Display + 'a> {
@@ -311,7 +311,7 @@ impl<I: AsRef<str>, Id: fmt::Display + Eq> Cache<Id> for (Id, &'_ Source<I>) {
         if id == &self.0 {
             Ok(self.1)
         } else {
-            Err(Box::new(format!("Failed to fetch source '{}'", id)))
+            Err(Box::new(format!("Failed to fetch source '{id}'")))
         }
     }
     fn display<'a>(&self, id: &'a Id) -> Option<impl fmt::Display + 'a> {
@@ -401,7 +401,7 @@ where
     S: AsRef<str>,
     I: IntoIterator<Item = (Id, S)>,
 {
-    FnCache::new((move |id| Err(format!("Failed to fetch source '{}'", id))) as fn(&_) -> _)
+    FnCache::new((move |id| Err(format!("Failed to fetch source '{id}'"))) as fn(&_) -> _)
         .with_sources(
             iter.into_iter()
                 .map(|(id, s)| (id, Source::from(s)))

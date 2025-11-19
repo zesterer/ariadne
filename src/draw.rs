@@ -1,6 +1,7 @@
 use super::*;
 use yansi::Paint;
 
+#[allow(dead_code)]
 pub struct Characters {
     pub hbar: char,
     pub vbar: char,
