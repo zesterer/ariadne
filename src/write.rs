@@ -437,6 +437,12 @@ impl<S: Span> Report<'_, S> {
                                         }));
                                     }
                                 }
+
+                                if let Some(margin) = margin_label.as_ref().filter(|m| {
+                                    is_end && is_line && std::ptr::eq(*label, m.label) && col > i
+                                }) {
+                                    hbar = Some(margin.label);
+                                }
                             }
                         }
 
@@ -449,12 +455,12 @@ impl<S: Span> Report<'_, S> {
                             }
                         }
 
-                        hbar = hbar.filter(|l| {
-                            margin_label
-                                .as_ref()
-                                .map_or(true, |margin| !std::ptr::eq(margin.label, *l))
-                                || !is_line
-                        });
+                        // hbar = hbar.filter(|l| {
+                        //     margin_label
+                        //         .as_ref()
+                        //         .map_or(true, |margin| !std::ptr::eq(margin.label, *l))
+                        //         || !is_line
+                        // });
 
                         let (a, b) = if let Some((label, is_start)) = corner {
                             (
@@ -462,12 +468,38 @@ impl<S: Span> Report<'_, S> {
                                     .fg(label.display_info.color, s),
                                 draw.hbar.fg(label.display_info.color, s),
                             )
-                        } else if let Some(label) =
-                            vbar.filter(|_| hbar.is_some() && !self.config.cross_gap)
-                        {
+                        } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
                             (
-                                draw.xbar.fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
+                                if self.config.cross_gap {
+                                    draw.vbar.fg(v_label.display_info.color, s)
+                                } else {
+                                    draw.xbar.fg(v_label.display_info.color, s)
+                                },
+                                draw.hbar.fg(h_label.display_info.color, s),
+                            )
+                        } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
+                            let is_col =
+                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
+                            let is_limit = col == multi_labels_with_message.len();
+                            (
+                                if is_limit {
+                                    if self.config.multiline_arrows {
+                                        draw.rarrow
+                                    } else {
+                                        draw.hbar
+                                    }
+                                } else if is_col {
+                                    if is_start {
+                                        draw.ltop
+                                    } else {
+                                        draw.lcross
+                                    }
+                                } else {
+                                    draw.hbar
+                                }
+                                .fg(margin.label.display_info.color, s),
+                                if !is_limit { draw.hbar } else { ' ' }
+                                    .fg(margin.label.display_info.color, s),
                             )
                         } else if let Some(label) = hbar {
                             (
@@ -483,26 +515,6 @@ impl<S: Span> Report<'_, S> {
                                 }
                                 .fg(label.display_info.color, s),
                                 ' '.fg(None, s),
-                            )
-                        } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
-                            let is_col =
-                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
-                            let is_limit = col == multi_labels_with_message.len();
-                            (
-                                if is_limit {
-                                    draw.rarrow
-                                } else if is_col {
-                                    if is_start {
-                                        draw.ltop
-                                    } else {
-                                        draw.lcross
-                                    }
-                                } else {
-                                    draw.hbar
-                                }
-                                .fg(margin.label.display_info.color, s),
-                                if !is_limit { draw.hbar } else { ' ' }
-                                    .fg(margin.label.display_info.color, s),
                             )
                         } else {
                             (' '.fg(None, s), ' '.fg(None, s))
@@ -864,8 +876,6 @@ impl<S: Span> Report<'_, S> {
                                     draw.xbar.fg(vbar_ll.label.display_info.color, s),
                                     ' '.fg(line_label.label.display_info.color, s),
                                 ]
-                            } else if is_hbar {
-                                [draw.hbar.fg(line_label.label.display_info.color, s); 2]
                             } else {
                                 [
                                     if vbar_ll.multi.is_some() && row == 0 && self.config.compact {
@@ -1077,7 +1087,7 @@ mod tests {
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an apple
+           |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
         ---'
@@ -1103,7 +1113,7 @@ mod tests {
            |
          1 | äpplë == örängë;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an äpplë
+           |   `---------|---- This is an äpplë
            |             |
            |             `---- This is an örängë
         ---'
@@ -1129,7 +1139,7 @@ mod tests {
            |
          1 | äpplë == örängë;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an äpplë
+           |   `---------|---- This is an äpplë
            |             |
            |             `---- This is an örängë
         ---'
@@ -1155,7 +1165,7 @@ mod tests {
            |
          1 | äpplë == örängë;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an äpplë
+           |   `---------|---- This is an äpplë
            |             |
            |             `---- This is an örängë
         ---'
@@ -1400,7 +1410,7 @@ mod tests {
            |
          1 | https://example.com/
            | ^^|^^^^^^^|^^^^^^^^^
-           |   `------------------- scheme
+           |   `-------|----------- scheme
            |           |
            |           `----------- URL
         ---'
@@ -1433,11 +1443,11 @@ mod tests {
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an apple
+           |   `---------|---- This is an apple
            |   |         |
-           |   `-------------- Have I mentioned that this is an apple?
+           |   `---------|---- Have I mentioned that this is an apple?
            |   |         |
-           |   `-------------- No really, have I mentioned that?
+           |   `---------|---- No really, have I mentioned that?
            |             |
            |             `---- This is an orange
            |             |
@@ -1467,7 +1477,7 @@ mod tests {
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an apple
+           |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
            |
@@ -1495,7 +1505,7 @@ mod tests {
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an apple
+           |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
            |
@@ -1524,7 +1534,7 @@ mod tests {
            |
          1 | apple == orange;
            | ^^|^^    ^^^|^^
-           |   `-------------- This is an apple
+           |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
            |

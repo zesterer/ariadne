@@ -213,8 +213,8 @@ fn main() {
         )
         .with_config(
             Config::default()
-                .with_cross_gap(false)
-                .with_compact(true)
+                .with_cross_gap(true)
+                .with_compact(false)
                 .with_underlines(true)
                 .with_tab_width(4)
                 .with_minimise_crossings(true),
