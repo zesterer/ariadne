@@ -129,7 +129,7 @@ impl<S: Span> Report<'_, S> {
 
             labels.push((label_info, label_source));
         }
-        labels.sort_by_key(|(l, _)| l.display_info.order);
+        labels.sort_by_key(|(l, _)| (l.display_info.order, l.end_line, l.start_line));
         let mut groups = Vec::<SourceGroup<_>>::new();
         for (label, src_id) in labels {
             match groups.last_mut() {
