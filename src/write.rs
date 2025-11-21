@@ -1034,9 +1034,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from("")),
         );
-        assert_snapshot!(msg, @r###"
-        Error: can't compare apples with oranges
-        "###)
+        assert_snapshot!(msg, @r###"Error: can't compare apples with oranges"###)
     }
 
     #[test]
