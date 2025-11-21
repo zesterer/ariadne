@@ -428,9 +428,10 @@ pub enum LabelAttach {
 }
 
 /// Possible character sets to use when rendering diagnostics.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum CharSet {
     /// Unicode characters (an attempt is made to use only commonly-supported characters).
+    #[default]
     Unicode,
     /// ASCII-only characters.
     Ascii,
