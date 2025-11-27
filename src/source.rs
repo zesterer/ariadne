@@ -340,6 +340,21 @@ impl Cache<Path> for FileCache {
     }
 }
 
+impl Cache<&Path> for FileCache {
+    type Storage = String;
+
+    fn fetch(&mut self, path: &&Path) -> Result<&Source, impl fmt::Debug> {
+        Ok::<_, Error>(match self.files.entry(path.to_path_buf()) {
+            // TODO: Don't allocate here
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(Source::from(fs::read_to_string(path)?)),
+        })
+    }
+    fn display<'a>(&self, path: &'a& Path) -> Option<impl fmt::Display + 'a> {
+        Some(Box::new(path.display()))
+    }
+}
+
 /// A [`Cache`] that fetches [`Source`]s using the provided function.
 #[derive(Debug, Clone)]
 pub struct FnCache<Id, F, I>
