@@ -50,7 +50,7 @@ struct SourceGroup<'a, S: Span> {
 }
 
 impl<S: Span> Report<'_, S> {
-    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
+    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<'_, S>> {
         let mut labels = Vec::new();
         for label in self.labels.iter() {
             let label_source = label.span.source();
