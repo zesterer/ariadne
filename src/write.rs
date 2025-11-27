@@ -88,9 +88,9 @@ impl<S: Span> Report<'_, S> {
                         continue;
                     };
                     let line_text = src.get_line_text(start_line_obj).unwrap();
-
-                    let num_chars_before_start = line_text[..start_byte_col.min(line_text.len())]
-                        .chars()
+                    let num_chars_before_start = line_text
+                        .char_indices()
+                        .take_while(|(i, _)| *i < start_byte_col)
                         .count();
                     let start_char_offset = start_line_obj.offset() + num_chars_before_start;
 
@@ -105,9 +105,10 @@ impl<S: Span> Report<'_, S> {
                             continue;
                         };
                         let end_line_text = src.get_line_text(end_line_obj).unwrap();
-                        // Have to add 1 back now, so we don't cut a char in two.
-                        let num_chars_before_end =
-                            end_line_text[..end_byte_col + 1].chars().count();
+                        let num_chars_before_end = end_line_text
+                            .char_indices()
+                            .take_while(|(i, _)| *i <= end_byte_col)
+                            .count();
                         let end_char_offset = end_line_obj.offset() + num_chars_before_end;
 
                         (start_char_offset..end_char_offset, start_line, end_line)
@@ -256,9 +257,10 @@ impl<S: Span> Report<'_, S> {
                 IndexType::Char => src.get_offset_line(location),
                 IndexType::Byte => src.get_byte_line(location).map(|(line_obj, idx, col)| {
                     let line_text = src.get_line_text(line_obj).unwrap();
-
-                    let col = line_text[..col.min(line_text.len())].chars().count();
-
+                    let col = line_text
+                        .char_indices()
+                        .take_while(|(i, _)| *i < col)
+                        .count();
                     (line_obj, idx, col)
                 }),
             };
