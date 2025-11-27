@@ -1043,9 +1043,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from("")),
         );
-        assert_snapshot!(msg, @r###"
-        Error: can't compare apples with oranges
-        "###)
+        assert_snapshot!(msg, @"Error: can't compare apples with oranges")
     }
 
     #[test]
@@ -1061,13 +1059,13 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these spans still showed up (like codespan-reporting does)
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1083,7 +1081,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1093,7 +1091,7 @@ mod tests {
            |             |
            |             `---- This is an orange
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1109,7 +1107,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare äpplës with örängës
            ,-[ <unknown>:1:1 ]
            |
@@ -1119,7 +1117,7 @@ mod tests {
            |             |
            |             `---- This is an örängë
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1135,7 +1133,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare äpplës with örängës
            ,-[ <unknown>:1:1 ]
            |
@@ -1145,7 +1143,7 @@ mod tests {
            |             |
            |             `---- This is an örängë
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1161,7 +1159,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare äpplës with örängës
            ,-[ <unknown>:1:10 ]
            |
@@ -1171,7 +1169,7 @@ mod tests {
            |             |
            |             `---- This is an örängë
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1188,7 +1186,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if the start of long lines would be omitted (like rustc does)
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1196,7 +1194,7 @@ mod tests {
            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^^|^^
            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        `---- This is an orange
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1211,7 +1209,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: unexpected end of file
            ,-[ <unknown>:1:1 ]
            |
@@ -1219,7 +1217,7 @@ mod tests {
            |          |
            |          `- Unexpected end of file
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1234,7 +1232,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: unexpected end of file
            ,-[ <unknown>:1:1 ]
            |
@@ -1242,7 +1240,7 @@ mod tests {
            | |
            | `- No more fruit!
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1258,7 +1256,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: unexpected end of file
            ,-[ <unknown>:1:1 ]
            |
@@ -1268,7 +1266,7 @@ mod tests {
            |
            | Help: have you tried going to the farmer's market?
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1284,7 +1282,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: unexpected end of file
            ,-[ <unknown>:1:1 ]
            |
@@ -1294,7 +1292,7 @@ mod tests {
            |
            | Note: eat your greens!
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1311,7 +1309,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: unexpected end of file
            ,-[ <unknown>:1:1 ]
            |
@@ -1323,7 +1321,7 @@ mod tests {
            |
            | Note: eat your greens!
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1373,7 +1371,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if the 2nd line wasn't omitted
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error:
            ,-[ <unknown>:1:1 ]
            |
@@ -1383,7 +1381,7 @@ mod tests {
            | |
            | `----------- illegal comparison
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1397,7 +1395,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if the 2nd line wasn't omitted
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error:
            ,-[ <unknown>:1:1 ]
            |
@@ -1409,7 +1407,7 @@ mod tests {
            | `--------- illegal comparison
          6 |     fruit
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1424,7 +1422,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if you could tell where the spans start and end.
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error:
            ,-[ <unknown>:1:1 ]
            |
@@ -1434,7 +1432,7 @@ mod tests {
            |           |
            |           `----------- URL
         ---'
-        "###);
+        ");
     }
 
     #[test]
@@ -1457,7 +1455,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1475,7 +1473,7 @@ mod tests {
            |             |
            |             `---- No really, have I mentioned that?
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1491,7 +1489,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1503,7 +1501,7 @@ mod tests {
            |
            | Note: stop trying ... this is a fruitless endeavor
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1519,7 +1517,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1531,7 +1529,7 @@ mod tests {
            |
            | Help: have you tried peeling the orange?
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1548,7 +1546,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1562,7 +1560,7 @@ mod tests {
            |
            | Note: stop trying ... this is a fruitless endeavor
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1577,7 +1575,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1587,7 +1585,7 @@ mod tests {
            |
            | Note: No need to try, they can't be compared.
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1603,7 +1601,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1615,7 +1613,7 @@ mod tests {
            |
            | Note 2: Yeah, really, please stop.
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1631,7 +1629,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1644,7 +1642,7 @@ mod tests {
            | Note 2: Yeah, really, please stop.
            |         It has no resemblance.
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1660,7 +1658,7 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1673,7 +1671,7 @@ mod tests {
            | Help 2: Yeah, really, please stop.
            |         It has no resemblance.
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1692,7 +1690,7 @@ mod tests {
                     ("b", "fourth\nfifth\nfirst"),
                 ])),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error:
            ,-[ b:3:1 ]
            |
@@ -1718,7 +1716,7 @@ mod tests {
            | ^^|^^
            |   `---- 5
         ---'
-        "###)
+        ")
     }
 
     #[test]
@@ -1736,7 +1734,7 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         eprintln!("{msg}");
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @r"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
            |
@@ -1752,6 +1750,6 @@ mod tests {
            | |
            | `-------- multi 1
         ---'
-        "###)
+        ")
     }
 }
