@@ -1345,6 +1345,24 @@ mod tests {
     }
 
     #[test]
+    fn byte_spans_with_multibyte_chars_never_crash() {
+        let source = "  field: 日本語型名\n";
+
+        for i in 0..=source.len() {
+            for j in i..=source.len() {
+                let _ = remove_trailing(
+                    Report::build(ReportKind::Error, 0..0)
+                        .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                        .with_message("Label")
+                        .with_label(Label::new(i..j).with_message("Label"))
+                        .finish()
+                        .write_to_string(Source::from(source)),
+                );
+            }
+        }
+    }
+
+    #[test]
     fn multiline_label() {
         let source = "apple\n==\norange";
         let msg = remove_trailing(
