@@ -325,6 +325,7 @@ pub struct FileCache {
     files: HashMap<PathBuf, Source>,
 }
 
+// this is here for backwards compatibility
 impl Cache<Path> for FileCache {
     type Storage = String;
 
@@ -337,6 +338,17 @@ impl Cache<Path> for FileCache {
     }
     fn display<'a>(&self, path: &'a Path) -> Option<impl fmt::Display + 'a> {
         Some(Box::new(path.display()))
+    }
+}
+
+impl Cache<&Path> for FileCache {
+    type Storage = String;
+
+    fn fetch(&mut self, path: &&Path) -> Result<&Source, impl fmt::Debug> {
+        Cache::<Path>::fetch(self, *path)
+    }
+    fn display<'a>(&self, path: &'a &Path) -> Option<impl fmt::Display + 'a> {
+        Cache::<Path>::display(self, *path)
     }
 }
 
