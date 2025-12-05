@@ -4,7 +4,8 @@ use std::ops::Range;
 use crate::{Config, IndexType, LabelDisplay};
 
 use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
-use super::{Cache, CharSet, LabelAttach, Report, ReportKind, Show, Span, Write};
+use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Show, Span, Write};
+
 
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
 //
@@ -49,8 +50,8 @@ struct SourceGroup<'a, S: Span> {
     labels: Vec<LabelInfo<'a>>,
 }
 
-impl<S: Span> Report<'_, S> {
-    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<S>> {
+impl<K: ReportStyle, S: Span> Report<K, S> {
+    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<'_, S>> {
         let mut labels = Vec::new();
         for label in self.labels.iter() {
             let label_source = label.span.source();
@@ -198,12 +199,7 @@ impl<S: Span> Report<'_, S> {
 
         let code = self.code.as_ref().map(|c| format!("[{c}] "));
         let id = format!("{}{}:", Show(code), self.kind);
-        let kind_color = match self.kind {
-            ReportKind::Error => self.config.error_color(),
-            ReportKind::Warning => self.config.warning_color(),
-            ReportKind::Advice => self.config.advice_color(),
-            ReportKind::Custom(_, color) => Some(color),
-        };
+        let kind_color = self.kind.get_color(&self.config);
         writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
 
         let groups = self.get_source_groups(&mut cache);
@@ -1014,9 +1010,11 @@ mod tests {
 
     use insta::assert_snapshot;
 
-    use crate::{Cache, CharSet, Config, IndexType, Label, Report, ReportKind, Source, Span};
+    use crate::{
+        Cache, CharSet, Config, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
+    };
 
-    impl<S: Span> Report<'_, S> {
+    impl<K: ReportStyle, S: Span> Report<K, S> {
         fn write_to_string<C: Cache<S::SourceId>>(&self, cache: C) -> String {
             let mut vec = Vec::new();
             self.write(cache, &mut vec).unwrap();
