@@ -200,7 +200,7 @@ impl<S: Span> Label<S> {
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
-pub struct Report<K: ReportStyle, S: Span = Range<usize>> {
+pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind<'static>> {
     kind: K,
     code: Option<String>,
     msg: Option<String>,
@@ -211,11 +211,11 @@ pub struct Report<K: ReportStyle, S: Span = Range<usize>> {
     config: Config,
 }
 
-impl<K: ReportStyle, S: Span> Report<K, S> {
+impl<S: Span, K: ReportStyle> Report<S, K> {
     /// Begin building a new [`Report`].
     ///
     /// The span is the primary location at which the error should be reported.
-    pub fn build(kind: K, span: S) -> ReportBuilder<K, S> {
+    pub fn build(kind: K, span: S) -> ReportBuilder<S, K> {
         ReportBuilder {
             kind,
             code: None,
@@ -242,7 +242,7 @@ impl<K: ReportStyle, S: Span> Report<K, S> {
     }
 }
 
-impl<K: ReportStyle, S: Span> fmt::Debug for Report<K, S> {
+impl<S: Span, K: ReportStyle> fmt::Debug for Report<S, K> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Report")
             .field("kind", &self.kind)
@@ -255,13 +255,70 @@ impl<K: ReportStyle, S: Span> fmt::Debug for Report<K, S> {
     }
 }
 
-/// A triat for coloring messages, requires Debug+Display for debuging
-pub trait ReportStyle: Debug + Display {
+/// A triat for coloring messages, requires Display for naming the Report error/warning/note etc
+pub trait ReportStyle: Display + Debug {
     /// return the color (if any) to use for the Report
     fn get_color(&self, config: &Config) -> Option<Color>;
 }
 
-/// A type that defines the kind of report being produced.
+///Simple struct implementing [`ReportStyle`] for errors
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct ErrorStyle;
+
+///Simple struct implementing [`ReportStyle`] for warnings
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct WarningStyle;
+
+///Simple struct implementing [`ReportStyle`] for advice
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct AdviceStyle;
+
+impl fmt::Display for ErrorStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Error")
+    }
+}
+
+impl fmt::Display for WarningStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Warning")
+    }
+}
+
+impl fmt::Display for AdviceStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Advice")
+    }
+}
+
+impl ReportStyle for ErrorStyle {
+    fn get_color(&self, config: &Config) -> Option<Color> {
+        config.error_color()
+    }
+}
+
+impl ReportStyle for WarningStyle {
+    fn get_color(&self, config: &Config) -> Option<Color> {
+        config.warning_color()
+    }
+}
+
+impl ReportStyle for AdviceStyle {
+    fn get_color(&self, config: &Config) -> Option<Color> {
+        config.advice_color()
+    }
+}
+
+/**
+ * This type is part of the legacy API
+ *
+ * most new code would want to either implement [`ReportStyle`] directly
+ * or wrap this struct like so
+ * ```ignore
+ * pub type ReportKind = ariadne::ReportKind<'static>;
+ * ```
+ */
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReportKind<'a> {
     /// The report is an error and indicates a critical problem that prevents the program performing the requested
@@ -272,12 +329,15 @@ pub enum ReportKind<'a> {
     Warning,
     /// The report is advice to the user about a potential anti-pattern of other benign issues.
     Advice,
-    /// The report is of a kind not built into Ariadne.
+
+    /// The report is of a kind not built into Ariadne (This is a legacy API).
+    #[deprecated(note = "use ReportStyle directly instead")]
     Custom(&'a str, Color),
 }
 
 impl fmt::Display for ReportKind<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        #[allow(deprecated)]
         match self {
             ReportKind::Error => write!(f, "Error"),
             ReportKind::Warning => write!(f, "Warning"),
@@ -289,6 +349,7 @@ impl fmt::Display for ReportKind<'_> {
 
 impl ReportStyle for ReportKind<'_> {
     fn get_color(&self, config: &Config) -> Option<Color> {
+        #[allow(deprecated)]
         match self {
             ReportKind::Error => config.error_color(),
             ReportKind::Warning => config.warning_color(),
@@ -299,7 +360,7 @@ impl ReportStyle for ReportKind<'_> {
 }
 
 /// A type used to build a [`Report`].
-pub struct ReportBuilder<K: ReportStyle, S: Span> {
+pub struct ReportBuilder<S: Span, K: ReportStyle> {
     kind: K,
     code: Option<String>,
     msg: Option<String>,
@@ -310,7 +371,7 @@ pub struct ReportBuilder<K: ReportStyle, S: Span> {
     config: Config,
 }
 
-impl<K: ReportStyle, S: Span> ReportBuilder<K, S> {
+impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
     pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
         self.code = Some(format!("{code:02}"));
@@ -407,7 +468,7 @@ impl<K: ReportStyle, S: Span> ReportBuilder<K, S> {
     }
 
     /// Finish building the [`Report`].
-    pub fn finish(self) -> Report<K, S> {
+    pub fn finish(self) -> Report<S, K> {
         Report {
             kind: self.kind,
             code: self.code,
@@ -421,7 +482,7 @@ impl<K: ReportStyle, S: Span> ReportBuilder<K, S> {
     }
 }
 
-impl<K: ReportStyle, S: Span> fmt::Debug for ReportBuilder<K, S> {
+impl<S: Span, K: ReportStyle> fmt::Debug for ReportBuilder<S, K> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)

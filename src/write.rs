@@ -50,7 +50,7 @@ struct SourceGroup<'a, S: Span> {
     labels: Vec<LabelInfo<'a>>,
 }
 
-impl<K: ReportStyle, S: Span> Report<K, S> {
+impl<S: Span, K: ReportStyle> Report<S, K> {
     fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<'_, S>> {
         let mut labels = Vec::new();
         for label in self.labels.iter() {
@@ -1014,7 +1014,7 @@ mod tests {
         Cache, CharSet, Config, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
     };
 
-    impl<K: ReportStyle, S: Span> Report<K, S> {
+    impl<S: Span, K: ReportStyle> Report<S, K> {
         fn write_to_string<C: Cache<S::SourceId>>(&self, cache: C) -> String {
             let mut vec = Vec::new();
             self.write(cache, &mut vec).unwrap();
