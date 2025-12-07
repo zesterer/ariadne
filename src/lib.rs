@@ -200,7 +200,7 @@ impl<S: Span> Label<S> {
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
-pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind<'static>> {
+pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind> {
     kind: K,
     code: Option<String>,
     msg: Option<String>,
@@ -261,66 +261,45 @@ pub trait ReportStyle: Display + Debug {
     fn get_color(&self, config: &Config) -> Option<Color>;
 }
 
-///Simple struct implementing [`ReportStyle`] for errors
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct ErrorStyle;
-
-///Simple struct implementing [`ReportStyle`] for warnings
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct WarningStyle;
-
-///Simple struct implementing [`ReportStyle`] for advice
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct AdviceStyle;
-
-impl fmt::Display for ErrorStyle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("Error")
+impl ReportStyle for String {
+    fn get_color(&self, _: &Config) -> Option<Color> {
+        None
     }
 }
 
-impl fmt::Display for WarningStyle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("Warning")
+impl ReportStyle for &str {
+    fn get_color(&self, _: &Config) -> Option<Color> {
+        None
     }
 }
 
-impl fmt::Display for AdviceStyle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("Advice")
+/// an implementation of `ReportStyle` intended for genral use
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BasicStyle<Str: Display + Debug = String> {
+    /// the name to display in labels
+    pub name: Str,
+    /// color to use
+    pub color: Color,
+}
+
+impl<Str: Display + Debug> Display for BasicStyle<Str> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 
-impl ReportStyle for ErrorStyle {
-    fn get_color(&self, config: &Config) -> Option<Color> {
-        config.error_color()
-    }
-}
-
-impl ReportStyle for WarningStyle {
-    fn get_color(&self, config: &Config) -> Option<Color> {
-        config.warning_color()
-    }
-}
-
-impl ReportStyle for AdviceStyle {
-    fn get_color(&self, config: &Config) -> Option<Color> {
-        config.advice_color()
+impl<Str: Display + Debug> ReportStyle for BasicStyle<Str> {
+    fn get_color(&self, _: &Config) -> Option<Color> {
+        Some(self.color)
     }
 }
 
 /**
- * This type is part of the legacy API
- *
- * most new code would want to either implement [`ReportStyle`] directly
- * or wrap this struct like so
- * ```ignore
- * pub type ReportKind = ariadne::ReportKind<'static>;
- * ```
+ * A Type for basic error handeling in all common cases.
  */
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ReportKind<'a> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ReportKind {
     /// The report is an error and indicates a critical problem that prevents the program performing the requested
     /// action.
     Error,
@@ -330,14 +309,12 @@ pub enum ReportKind<'a> {
     /// The report is advice to the user about a potential anti-pattern of other benign issues.
     Advice,
 
-    /// The report is of a kind not built into Ariadne (This is a legacy API).
-    #[deprecated(note = "use ReportStyle directly instead")]
-    Custom(&'a str, Color),
+    /// Flexible type similar to [`BasicStyle`].
+    Custom(String, Color),
 }
 
-impl fmt::Display for ReportKind<'_> {
+impl fmt::Display for ReportKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        #[allow(deprecated)]
         match self {
             ReportKind::Error => write!(f, "Error"),
             ReportKind::Warning => write!(f, "Warning"),
@@ -347,9 +324,8 @@ impl fmt::Display for ReportKind<'_> {
     }
 }
 
-impl ReportStyle for ReportKind<'_> {
+impl ReportStyle for ReportKind {
     fn get_color(&self, config: &Config) -> Option<Color> {
-        #[allow(deprecated)]
         match self {
             ReportKind::Error => config.error_color(),
             ReportKind::Warning => config.warning_color(),

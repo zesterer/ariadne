@@ -6,7 +6,6 @@ use crate::{Config, IndexType, LabelDisplay};
 use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
 use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Show, Span, Write};
 
-
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
 //
 // - This code is complex and has a lot of implicit invariants
