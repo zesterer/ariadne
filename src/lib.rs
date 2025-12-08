@@ -446,6 +446,15 @@ pub enum IndexType {
     Char,
 }
 
+/// Whether rendering of ANSI styling, such as color and font weight, is enabled.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AnsiMode {
+    /// ANSI styling is disabled, diagnostics will display without styling.
+    Off,
+    /// ANSI styling is disabled, diagnostics will have ANSI styling escape codes included.
+    On,
+}
+
 /// A type used to configure a report
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Config {
@@ -460,6 +469,7 @@ pub struct Config {
     index_type: IndexType,
     minimise_crossings: bool,
     context_lines: usize,
+    ansi_mode: AnsiMode,
 }
 
 impl Config {
@@ -544,6 +554,13 @@ impl Config {
         self.context_lines = context_lines;
         self
     }
+    /// Should ANSI escape code styling be included in the diagnostic after writing?
+    ///
+    /// If unspecified, this defaults to `AnsiMode::On`.
+    pub const fn with_ansi_mode(mut self, ansi_mode: AnsiMode) -> Self {
+        self.ansi_mode = ansi_mode;
+        self
+    }
 
     fn error_color(&self) -> Option<Color> {
         Some(Color::Red).filter(|_| self.color)
@@ -597,6 +614,7 @@ impl Config {
             index_type: IndexType::Char,
             minimise_crossings: false,
             context_lines: 0,
+            ansi_mode: AnsiMode::On,
         }
     }
 }

@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use crate::{Config, IndexType, LabelDisplay};
 
-use super::draw::{self, StreamAwareFmt, StreamType};
+use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
 use super::{Cache, CharSet, LabelAttach, Report, ReportKind, Show, Span, Write};
 
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
@@ -185,9 +185,10 @@ impl<S: Span> Report<'_, S> {
     fn write_for_stream<C: Cache<S::SourceId>, W: Write>(
         &self,
         mut cache: C,
-        mut w: W,
+        w: W,
         s: StreamType,
     ) -> io::Result<()> {
+        let mut w = WrappedWriter::new(w, &self.config);
         let draw = match self.config.char_set {
             CharSet::Unicode => draw::Characters::unicode(),
             CharSet::Ascii => draw::Characters::ascii(),
@@ -338,7 +339,7 @@ impl<S: Span> Report<'_, S> {
                 multi_labels_with_message.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
             }
 
-            let write_margin = |w: &mut W,
+            let write_margin = |w: &mut WrappedWriter<W>,
                                 idx: usize,
                                 is_line: bool,
                                 is_ellipsis: bool,
