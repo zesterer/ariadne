@@ -258,7 +258,9 @@ impl<S: Span, K: ReportStyle> fmt::Debug for Report<S, K> {
 /// A triat for coloring messages, requires Display for naming the Report error/warning/note etc
 pub trait ReportStyle: Display + Debug {
     /// return the color (if any) to use for the Report
-    fn get_color(&self, config: &Config) -> Option<Color>;
+    fn get_color(&self, _config: &Config) -> Option<Color> {
+        None
+    }
 }
 
 impl ReportStyle for String {
@@ -297,8 +299,7 @@ impl<Str: Display + Debug> ReportStyle for BasicStyle<Str> {
 /**
  * A Type for basic error handeling in all common cases.
  */
-
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReportKind {
     /// The report is an error and indicates a critical problem that prevents the program performing the requested
     /// action.
@@ -309,12 +310,13 @@ pub enum ReportKind {
     /// The report is advice to the user about a potential anti-pattern of other benign issues.
     Advice,
 
-    /// Flexible type similar to [`BasicStyle`].
-    Custom(String, Color),
+    /// The report is of a kind not built into Ariadne.
+    Custom(&'static str, Color),
 }
 
 impl fmt::Display for ReportKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        #[allow(deprecated)]
         match self {
             ReportKind::Error => write!(f, "Error"),
             ReportKind::Warning => write!(f, "Warning"),
@@ -326,6 +328,7 @@ impl fmt::Display for ReportKind {
 
 impl ReportStyle for ReportKind {
     fn get_color(&self, config: &Config) -> Option<Color> {
+        #[allow(deprecated)]
         match self {
             ReportKind::Error => config.error_color(),
             ReportKind::Warning => config.warning_color(),
