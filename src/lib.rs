@@ -291,8 +291,8 @@ impl<Str: Display + Debug> Display for BasicStyle<Str> {
 }
 
 impl<Str: Display + Debug> ReportStyle for BasicStyle<Str> {
-    fn get_color(&self, _: &Config) -> Option<Color> {
-        Some(self.color)
+    fn get_color(&self, config: &Config) -> Option<Color> {
+        Some(self.color).filter(|_| config.color)
     }
 }
 
@@ -333,7 +333,7 @@ impl ReportStyle for ReportKind {
             ReportKind::Error => config.error_color(),
             ReportKind::Warning => config.warning_color(),
             ReportKind::Advice => config.advice_color(),
-            ReportKind::Custom(_, color) => Some(*color),
+            ReportKind::Custom(_, color) => Some(*color).filter(|_| config.color),
         }
     }
 }
