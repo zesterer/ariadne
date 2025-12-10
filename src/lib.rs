@@ -124,9 +124,15 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, RangeInclus
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct LabelDisplay {
     msg: Option<String>,
-    color: Option<Color>,
+    raw_color: Option<Color>,
     order: i32,
     priority: i32,
+}
+
+impl LabelDisplay {
+    fn color(&self, config: &Config) -> Option<Color> {
+        self.raw_color.filter(|_| config.color)
+    }
 }
 
 /// A type that represents a labelled section of source code.
@@ -150,7 +156,7 @@ impl<S: Span> Label<S> {
             span,
             display_info: LabelDisplay {
                 msg: None,
-                color: None,
+                raw_color: None,
                 order: 0,
                 priority: 0,
             },
@@ -165,7 +171,7 @@ impl<S: Span> Label<S> {
 
     /// Give this label a highlight colour.
     pub fn with_color(mut self, color: Color) -> Self {
-        self.display_info.color = Some(color);
+        self.display_info.raw_color = Some(color);
         self
     }
 
@@ -421,11 +427,7 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
 
     /// Add multiple labels to the report.
     pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) {
-        let config = &self.config; // This would not be necessary in Rust 2021 edition
-        self.labels.extend(labels.into_iter().map(|mut label| {
-            label.display_info.color = config.filter_color(label.display_info.color);
-            label
-        }));
+        self.labels.extend(labels);
     }
 
     /// Add a label to the report.
@@ -504,15 +506,6 @@ pub enum IndexType {
     Char,
 }
 
-/// Whether rendering of ANSI styling, such as color and font weight, is enabled.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AnsiMode {
-    /// ANSI styling is disabled, diagnostics will display without styling.
-    Off,
-    /// ANSI styling is disabled, diagnostics will have ANSI styling escape codes included.
-    On,
-}
-
 /// A type used to configure a report
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Config {
@@ -527,7 +520,6 @@ pub struct Config {
     index_type: IndexType,
     minimise_crossings: bool,
     context_lines: usize,
-    ansi_mode: AnsiMode,
 }
 
 impl Config {
@@ -612,13 +604,6 @@ impl Config {
         self.context_lines = context_lines;
         self
     }
-    /// Should ANSI escape code styling be included in the diagnostic after writing?
-    ///
-    /// If unspecified, this defaults to `AnsiMode::On`.
-    pub const fn with_ansi_mode(mut self, ansi_mode: AnsiMode) -> Self {
-        self.ansi_mode = ansi_mode;
-        self
-    }
 
     fn error_color(&self) -> Option<Color> {
         Some(Color::Red).filter(|_| self.color)
@@ -640,9 +625,6 @@ impl Config {
     }
     fn note_color(&self) -> Option<Color> {
         Some(Color::Fixed(115)).filter(|_| self.color)
-    }
-    fn filter_color(&self, color: Option<Color>) -> Option<Color> {
-        color.filter(|_| self.color)
     }
 
     // Find the character that should be drawn and the number of times it should be drawn for each char
@@ -672,7 +654,6 @@ impl Config {
             index_type: IndexType::Char,
             minimise_crossings: false,
             context_lines: 0,
-            ansi_mode: AnsiMode::On,
         }
     }
 }
