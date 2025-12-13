@@ -12,6 +12,7 @@ pub use crate::{
     draw::{ColorGenerator, Fmt},
     source::{sources, Cache, FileCache, FnCache, Line, Source},
 };
+use std::sync::Arc;
 pub use yansi::Color;
 
 #[cfg(any(feature = "concolor", doc))]
@@ -119,6 +120,207 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, RangeInclus
         *self.1.end() + 1
     }
 }
+
+/// A trait for messages like raw strings or styled strings
+/// note that display should be implemnted without style
+pub trait Message {
+    /// what to render in the report
+    fn render(&self, f: &mut fmt::Formatter, with_style: bool, color: Option<Color>)
+        -> fmt::Result;
+}
+
+/// an object that can be styled
+pub trait Styleble<Style, Output> {
+    /// apply style to this type
+    fn with_style(self, s: Style) -> Output;
+}
+
+/// simple message that can be used for rendring
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct BasicMessage(String);
+
+impl<T: ToString> From<T> for BasicMessage {
+    fn from(s: T) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl Message for BasicMessage {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        _with_style: bool,
+        color: Option<Color>,
+    ) -> fmt::Result {
+        match color {
+            Some(c) => write!(f, "{}", self.0.as_str().fg(c)),
+            None => write!(f, "{}", self.0),
+        }
+    }
+}
+
+/// simple colored message that can be used for rendring
+/// the color takes precednce over defualt color
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct ColoredMessage(String, Option<Color>);
+
+impl Message for ColoredMessage {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        with_style: bool,
+        _color: Option<Color>,
+    ) -> fmt::Result {
+        match self.1.filter(|_| with_style) {
+            Some(c) => write!(f, "{}", self.0.as_str().fg(c)),
+            None => write!(f, "{}", self.0),
+        }
+    }
+}
+
+impl Styleble<Color, ColoredMessage> for String {
+    fn with_style(self, c: Color) -> ColoredMessage {
+        ColoredMessage(self, Some(c))
+    }
+}
+
+/// a wrapper type for functions that can be used with `FuncMessage`
+pub type ArcMessage = Arc<dyn Fn(&mut fmt::Formatter, bool, Option<Color>) -> fmt::Result>;
+
+/// A message captured through a closure
+/// this is useful for when you want a more elaborate message
+/// the output of format_text is currently this type
+#[derive(Clone)]
+pub struct FuncMessage(ArcMessage);
+impl Message for FuncMessage {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        with_style: bool,
+        color: Option<Color>,
+    ) -> fmt::Result {
+        self.0(f, with_style, color)
+    }
+}
+
+impl FuncMessage {
+    fn new(x: ArcMessage) -> Self {
+        Self(x.into())
+    }
+}
+
+/// A message taken by refrence useful for when you need Copy
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct RefMessage<'a, M: Message>(pub &'a M);
+impl<M: Message> Message for RefMessage<'_, M> {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        with_style: bool,
+        color: Option<Color>,
+    ) -> fmt::Result {
+        self.0.render(f, with_style, color)
+    }
+}
+
+impl<M: Message> Clone for RefMessage<'_, M> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+impl<M: Message> Copy for RefMessage<'_, M> {}
+
+#[doc(hidden)]
+#[allow(dead_code)]
+struct DisplayMessage<M: Message> {
+    m: M,
+    with_style: bool,
+    color: Option<Color>,
+}
+
+impl<M: Message> Display for DisplayMessage<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.m.render(f, self.with_style, self.color)
+    }
+}
+
+/// format text into `FuncMessage` that can then be displayed
+/// this is just syntax sugar around making a function
+#[macro_export]
+macro_rules! format_text {
+    ($fmt:literal $(, $arg:expr)* $(,)?) => {{
+        $crate::FuncMessage::new(std::sync::Arc::new(move |f: &mut std::fmt::Formatter<'_>,
+                                     with_style: bool,
+                                     color: Option<$crate::Color>| {
+            write!(
+                f,
+                $fmt,
+                $( DisplayMessage {
+                        m: RefMessage(&$arg),
+                        with_style,
+                        color
+                  } ),*
+            )
+        }))
+    }};
+}
+
+#[test]
+fn format_text_no_style() {
+    use yansi::Color;
+
+    let msg = "hello".to_string().with_style(Color::Red);
+    let m = format_text!("test: {}", msg);
+
+    let out = format!(
+        "{}",
+        DisplayMessage {
+            m,
+            with_style: false,
+            color: None,
+        }
+    );
+
+    assert_eq!(out, "test: hello");
+}
+
+#[test]
+fn format_text_emits_red_ansi() {
+    let msg = "hello".to_string().with_style(Color::Red);
+    let m = format_text!("X {} X", msg);
+
+    let out = format!(
+        "{}",
+        DisplayMessage {
+            m,
+            with_style: true,
+            color: None,
+        }
+    );
+
+    let expected = format!("X {} X", "\x1b[31mhello\x1b[0m");
+
+    assert_eq!(out, expected);
+}
+
+// /// complex message capable of printing anything
+// #[derive(Clone,Debug)]
+// pub enum RitchMessage{
+//     /// just a simple string
+//     Basic(BasicMessage),
+
+//     /// custom functions that can render anything
+//     Custom(Arc<dyn Message>)
+// }
+
+// impl Message for RitchMessage {
+// fn render(&self,f: &mut fmt::Formatter,with_style:bool,color:Option<Color>) -> fmt::Result{
+//     match self {
+//         RitchMessage::Basic(x)=>x.render(f,with_style,color),
+//         RitchMessage::Custom(x)=>x.render(f,with_style,color),
+//     }
+// }
+// }
 
 /// A type that represents the way a label should be displayed.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
