@@ -25,8 +25,11 @@ pub struct Characters {
     pub lcross: char,
     pub rcross: char,
 
-    pub underbar: char,
+    pub lunderbar: char,
+    pub runderbar: char,
+    pub munderbar: char,
     pub underline: char,
+    pub underbar_single: char,
 }
 
 impl Characters {
@@ -45,12 +48,15 @@ impl Characters {
             lbot: '╰',
             mbot: '┴',
             rbot: '╯',
-            lbox: '[',
-            rbox: ']',
+            lbox: '┤',
+            rbox: '│',
             lcross: '├',
             rcross: '┤',
-            underbar: '┬',
+            lunderbar: '┌',
+            runderbar: '┐',
+            munderbar: '┬',
             underline: '─',
+            underbar_single: '🭯',
         }
     }
 
@@ -67,14 +73,17 @@ impl Characters {
             mtop: 'v',
             rtop: '.',
             lbot: '`',
-            mbot: '^',
+            mbot: '-',
             rbot: '\'',
             lbox: '[',
             rbox: ']',
             lcross: '|',
             rcross: '|',
-            underbar: '|',
-            underline: '^',
+            lunderbar: '-',
+            runderbar: '-',
+            munderbar: '-',
+            underline: '-',
+            underbar_single: '^',
         }
     }
 }

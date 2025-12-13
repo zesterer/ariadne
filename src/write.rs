@@ -759,8 +759,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 // Arrows
                 for row in 0..line_labels.len() {
                     let line_label = &line_labels[row];
-                    if (line_label.label.display_info.msg.is_some() || row == 0)
-                        && !self.config.compact
+                    if row == 0
+                        || (line_label.label.display_info.msg.is_some() && !self.config.compact)
                     {
                         // Margin alternate
                         write_margin(
@@ -783,19 +783,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                             let underline = get_underline(col).filter(|_| row == 0);
                             let [c, tail] = if let Some(vbar_ll) = vbar {
                                 let [c, tail] = if underline.is_some() {
-                                    // TODO: Is this good?
-                                    // The `true` is used here because it's temporarily disabling a
-                                    // feature that might be reenabled later.
-                                    #[allow(clippy::overly_complex_bool_expr)]
-                                    if ExactSizeIterator::len(&vbar_ll.label.char_span) <= 1 || true
-                                    {
-                                        [draw.underbar, draw.underline]
+                                    if ExactSizeIterator::len(&vbar_ll.label.char_span) <= 1 {
+                                        [draw.underbar_single, draw.underline]
                                     } else if line.offset() + col == vbar_ll.label.char_span.start {
-                                        [draw.ltop, draw.underbar]
+                                        [draw.lunderbar, draw.munderbar]
                                     } else if line.offset() + col == vbar_ll.label.last_offset() {
-                                        [draw.rtop, draw.underbar]
+                                        [draw.runderbar, draw.munderbar]
                                     } else {
-                                        [draw.underbar, draw.underline]
+                                        [draw.munderbar, draw.underline]
                                     }
                                 } else if vbar_ll.multi.is_some()
                                     && row == 0
@@ -877,12 +872,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 ]
                             } else {
                                 [
-                                    if vbar_ll.multi.is_some() && row == 0 && self.config.compact {
-                                        draw.uarrow
-                                    } else {
-                                        draw.vbar
-                                    }
-                                    .fg(vbar_ll.label.display_info.color, s),
+                                    draw.vbar.fg(vbar_ll.label.display_info.color, s),
                                     ' '.fg(line_label.label.display_info.color, s),
                                 ]
                             }
@@ -1062,7 +1052,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^^^^    ^^^^^^
+           | -----    ------
         ---'
         "###);
     }
@@ -1084,9 +1074,9 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple
-           | ^^^^^
+           | -----
          2 | == orange;
-           |    ^^^^^^
+           |    ------
         ---'
         "###);
     }
@@ -1109,7 +1099,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
@@ -1134,10 +1124,10 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple ==
-           | ^^|^^
+           | -----
            |   `---- This is an apple
          2 | orange;
-           | ^^^|^^
+           | ------
            |    `---- This is an orange
         ---'
         "###);
@@ -1161,7 +1151,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an äpplë
            |             |
            |             `---- This is an örängë
@@ -1187,7 +1177,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an äpplë
            |             |
            |             `---- This is an örängë
@@ -1213,7 +1203,7 @@ mod tests {
            ,-[ <unknown>:1:10 ]
            |
          1 | äpplë == örängë;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an äpplë
            |             |
            |             `---- This is an örängë
@@ -1229,7 +1219,7 @@ mod tests {
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_label(
-                    Label::new(source.len() - 5..source.len()).with_message("This is an orange"),
+                    Label::new(source.len() - 6..source.len()).with_message("This is an orange"),
                 )
                 .finish()
                 .write_to_string(Source::from(source)),
@@ -1240,7 +1230,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
-           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^^|^^
+           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ------
            |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        `---- This is an orange
         ---'
         "###);
@@ -1458,7 +1448,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | https://example.com/
-           | ^^|^^^^^^^|^^^^^^^^^
+           | --------------------
            |   `-------|----------- scheme
            |           |
            |           `----------- URL
@@ -1491,7 +1481,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an apple
            |   |         |
            |   `---------|---- Have I mentioned that this is an apple?
@@ -1525,7 +1515,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
@@ -1553,7 +1543,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
@@ -1582,7 +1572,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^|^^    ^^^|^^
+           | -----    ------
            |   `---------|---- This is an apple
            |             |
            |             `---- This is an orange
@@ -1611,7 +1601,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^^^^^^|^^^^^^^
+           | ---------------
            |        `--------- This is a strange comparison
            |
            | Note: No need to try, they can't be compared.
@@ -1637,7 +1627,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^^^^^^|^^^^^^^
+           | ---------------
            |        `--------- This is a strange comparison
            |
            | Note 1: No need to try, they can't be compared.
@@ -1665,7 +1655,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^^^^^^|^^^^^^^
+           | ---------------
            |        `--------- This is a strange comparison
            |
            | Note 1: No need to try, they can't be compared.
@@ -1694,7 +1684,7 @@ mod tests {
            ,-[ <unknown>:1:1 ]
            |
          1 | apple == orange;
-           | ^^^^^^^|^^^^^^^
+           | ---------------
            |        `--------- This is a strange comparison
            |
            | Help 1: No need to try, they can't be compared.
@@ -1726,25 +1716,25 @@ mod tests {
            ,-[ b:3:1 ]
            |
          3 | first
-           | ^^|^^
+           | -----
            |   `---- 1
            |
            |-[ a:1:1 ]
            |
          1 | second
-           | ^^^|^^
+           | ------
            |    `---- 2
          2 | third
-           | ^^|^^
+           | -----
            |   `---- 3
            |
            |-[ b:1:1 ]
            |
          1 | fourth
-           | ^^^|^^
+           | ------
            |    `---- 4
          2 | fifth
-           | ^^|^^
+           | -----
            |   `---- 5
         ---'
         "###)
@@ -1770,12 +1760,12 @@ mod tests {
            |
          1 | ,-> begin
          2 | |   apple == orange;
-           | |   ^^|^^    ^^^|^^
+           | |   -----    ------
            | |     |         `---- This is an orange
            | |     |
            | |     `-------------- This is an apple
          3 | |-> end
-           | |     |
+           | |     ^
            | |     `-- single
            | |
            | `-------- multi 1
