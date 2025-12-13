@@ -270,7 +270,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             writeln!(
                 w,
                 "{}{}{}{} {} {}",
-                Show((' ', line_no_width + 2)),
+                Show((' ', line_no_width + 2)).fg(self.config.margin_color(), s),
                 if group_idx == 0 {
                     draw.ltop
                 } else {
@@ -349,7 +349,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         "{}{} {}",
                         Show((' ', line_no_width - line_no.chars().count())),
                         line_no,
-                        draw.vbar,
+                        draw.line_margin,
                     )
                     .fg(self.config.margin_color(), s)
                 } else {
@@ -1764,7 +1764,6 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        eprintln!("{msg}");
         assert_snapshot!(msg, @r###"
         Error: can't compare apples with oranges
            ,-[ <unknown>:1:1 ]
