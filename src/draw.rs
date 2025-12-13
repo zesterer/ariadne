@@ -29,6 +29,8 @@ pub struct Characters {
     pub runderbar: char,
     pub munderbar: char,
     pub underline: char,
+    pub underline_add: char,
+    pub underline_remove: char,
     pub underbar_single: char,
 }
 
@@ -56,6 +58,8 @@ impl Characters {
             runderbar: '┐',
             munderbar: '┬',
             underline: '─',
+            underline_add: '+',
+            underline_remove: 'x',
             underbar_single: '🭯',
         }
     }
@@ -83,6 +87,8 @@ impl Characters {
             runderbar: '-',
             munderbar: '-',
             underline: '-',
+            underline_add: '+',
+            underline_remove: 'x',
             underbar_single: '^',
         }
     }
