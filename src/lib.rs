@@ -184,6 +184,12 @@ impl Styleble<Color, ColoredMessage> for String {
     }
 }
 
+impl Styleble<Option<Color>, ColoredMessage> for String {
+    fn with_style(self, c: Option<Color>) -> ColoredMessage {
+        ColoredMessage(self, c)
+    }
+}
+
 /// a wrapper type for functions that can be used with `FuncMessage`
 pub type ArcMessage = Arc<dyn Fn(&mut fmt::Formatter, bool, Option<Color>) -> fmt::Result>;
 
@@ -203,11 +209,11 @@ impl Message for FuncMessage {
     }
 }
 
-impl FuncMessage {
-    fn new(x: ArcMessage) -> Self {
-        Self(x.into())
-    }
-}
+// impl FuncMessage {
+//     fn new(x: ArcMessage) -> Self {
+//         Self(x.into())
+//     }
+// }
 
 /// A message taken by refrence useful for when you need Copy
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -225,14 +231,13 @@ impl<M: Message> Message for RefMessage<'_, M> {
 
 impl<M: Message> Clone for RefMessage<'_, M> {
     fn clone(&self) -> Self {
-        Self(self.0)
+        *self
     }
 }
 impl<M: Message> Copy for RefMessage<'_, M> {}
 
 #[doc(hidden)]
-#[allow(dead_code)]
-struct DisplayMessage<M: Message> {
+pub(crate) struct DisplayMessage<M: Message> {
     m: M,
     with_style: bool,
     color: Option<Color>,
@@ -249,7 +254,7 @@ impl<M: Message> Display for DisplayMessage<M> {
 #[macro_export]
 macro_rules! format_text {
     ($fmt:literal $(, $arg:expr)* $(,)?) => {{
-        $crate::FuncMessage::new(std::sync::Arc::new(move |f: &mut std::fmt::Formatter<'_>,
+        $crate::FuncMessage(std::sync::Arc::new(move |f: &mut std::fmt::Formatter<'_>,
                                      with_style: bool,
                                      color: Option<$crate::Color>| {
             write!(
@@ -324,14 +329,14 @@ fn format_text_emits_red_ansi() {
 
 /// A type that represents the way a label should be displayed.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-struct LabelDisplay {
-    msg: Option<String>,
+struct LabelDisplay<M: Message> {
+    msg: Option<M>,
     raw_color: Option<Color>,
     order: i32,
     priority: i32,
 }
 
-impl LabelDisplay {
+impl<M: Message> LabelDisplay<M> {
     fn color(&self, config: &Config) -> Option<Color> {
         self.raw_color.filter(|_| config.color)
     }
@@ -339,9 +344,9 @@ impl LabelDisplay {
 
 /// A type that represents a labelled section of source code.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Label<S = Range<usize>> {
+pub struct Label<S = Range<usize>, M: Message = BasicMessage> {
     span: S,
-    display_info: LabelDisplay,
+    display_info: LabelDisplay<M>,
 }
 
 impl<S: Span> Label<S> {
@@ -352,6 +357,18 @@ impl<S: Span> Label<S> {
     ///
     /// Panics if the given span is backwards.
     pub fn new(span: S) -> Self {
+        Self::new_generic(span)
+    }
+}
+
+impl<S: Span, M: Message> Label<S, M> {
+    /// Create a new [`Label`].
+    /// If the span is specified as a `Range<usize>` the numbers have to be zero-indexed character offsets.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given span is backwards.
+    pub fn new_generic(span: S) -> Self {
         assert!(span.start() <= span.end(), "Label start is after its end");
 
         Self {
@@ -366,8 +383,8 @@ impl<S: Span> Label<S> {
     }
 
     /// Give this label a message.
-    pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
-        self.display_info.msg = Some(msg.to_string());
+    pub fn with_message<V: Into<M>>(mut self, msg: V) -> Self {
+        self.display_info.msg = Some(msg.into());
         self
     }
 
@@ -408,22 +425,22 @@ impl<S: Span> Label<S> {
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
-pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind> {
+pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind, M: Message = BasicMessage> {
     kind: K,
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
     help: Vec<String>,
     span: S,
-    labels: Vec<Label<S>>,
+    labels: Vec<Label<S, M>>,
     config: Config,
 }
 
-impl<S: Span, K: ReportStyle> Report<S, K> {
+impl<S: Span, K: ReportStyle, M: Message> Report<S, K, M> {
     /// Begin building a new [`Report`].
     ///
     /// The span is the primary location at which the error should be reported.
-    pub fn build(kind: K, span: S) -> ReportBuilder<S, K> {
+    pub fn build(kind: K, span: S) -> ReportBuilder<S, K, M> {
         ReportBuilder {
             kind,
             code: None,
@@ -547,18 +564,18 @@ impl ReportStyle for ReportKind {
 }
 
 /// A type used to build a [`Report`].
-pub struct ReportBuilder<S: Span, K: ReportStyle> {
+pub struct ReportBuilder<S: Span, K: ReportStyle, M: Message> {
     kind: K,
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
     help: Vec<String>,
     span: S,
-    labels: Vec<Label<S>>,
+    labels: Vec<Label<S, M>>,
     config: Config,
 }
 
-impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
+impl<S: Span, K: ReportStyle, M: Message> ReportBuilder<S, K, M> {
     /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
     pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
         self.code = Some(format!("{code:02}"));
@@ -566,12 +583,12 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 
     /// Set the message of this report.
-    pub fn set_message<M: ToString>(&mut self, msg: M) {
+    pub fn set_message<V: ToString>(&mut self, msg: V) {
         self.msg = Some(msg.to_string());
     }
 
     /// Add a message to this report.
-    pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
+    pub fn with_message<V: ToString>(mut self, msg: V) -> Self {
         self.msg = Some(msg.to_string());
         self
     }
@@ -623,23 +640,23 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 
     /// Add a label to the report.
-    pub fn add_label(&mut self, label: Label<S>) {
+    pub fn add_label(&mut self, label: Label<S, M>) {
         self.add_labels(std::iter::once(label));
     }
 
     /// Add multiple labels to the report.
-    pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) {
+    pub fn add_labels<L: IntoIterator<Item = Label<S, M>>>(&mut self, labels: L) {
         self.labels.extend(labels);
     }
 
     /// Add a label to the report.
-    pub fn with_label(mut self, label: Label<S>) -> Self {
+    pub fn with_label(mut self, label: Label<S, M>) -> Self {
         self.add_label(label);
         self
     }
 
     /// Add multiple labels to the report.
-    pub fn with_labels<L: IntoIterator<Item = Label<S>>>(mut self, labels: L) -> Self {
+    pub fn with_labels<L: IntoIterator<Item = Label<S, M>>>(mut self, labels: L) -> Self {
         self.add_labels(labels);
         self
     }
@@ -651,7 +668,7 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 
     /// Finish building the [`Report`].
-    pub fn finish(self) -> Report<S, K> {
+    pub fn finish(self) -> Report<S, K, M> {
         Report {
             kind: self.kind,
             code: self.code,
@@ -665,7 +682,7 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 }
 
-impl<S: Span, K: ReportStyle> fmt::Debug for ReportBuilder<S, K> {
+impl<S: Span, K: ReportStyle, M: Message + Debug> fmt::Debug for ReportBuilder<S, K, M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)
@@ -870,5 +887,5 @@ impl Default for Config {
 #[should_panic]
 #[allow(clippy::reversed_empty_ranges)]
 fn backwards_label_should_panic() {
-    Label::new(1..0);
+    Label::<Range<usize>, BasicMessage>::new(1..0);
 }

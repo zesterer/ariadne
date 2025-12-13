@@ -1,10 +1,12 @@
 use std::io;
 use std::ops::Range;
 
-use crate::{Config, IndexType, LabelDisplay};
+use crate::{Config, IndexType, LabelDisplay, Message};
 
 use super::draw::{self, StreamAwareFmt, StreamType};
-use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Show, Span, Write};
+use super::{
+    Cache, CharSet, DisplayMessage, LabelAttach, RefMessage, Report, ReportStyle, Show, Span, Write,
+};
 
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
 //
@@ -19,16 +21,16 @@ enum LabelKind {
     Multiline,
 }
 
-struct LabelInfo<'a> {
+struct LabelInfo<'a, M: Message> {
     kind: LabelKind,
     char_span: Range<usize>,
-    display_info: &'a LabelDisplay,
+    display_info: &'a LabelDisplay<M>,
     #[allow(dead_code)]
     start_line: usize,
     end_line: usize,
 }
 
-impl LabelInfo<'_> {
+impl<M: Message> LabelInfo<'_, M> {
     fn last_offset(&self) -> usize {
         self.char_span
             .end
@@ -42,15 +44,15 @@ impl LabelInfo<'_> {
     }
 }
 
-struct SourceGroup<'a, S: Span> {
+struct SourceGroup<'a, S: Span, M: Message> {
     src_id: &'a S::SourceId,
     char_span: Range<usize>,
     display_range: Range<usize>,
-    labels: Vec<LabelInfo<'a>>,
+    labels: Vec<LabelInfo<'a, M>>,
 }
 
-impl<S: Span, K: ReportStyle> Report<S, K> {
-    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<'_, S>> {
+impl<S: Span, K: ReportStyle, M: Message> Report<S, K, M> {
+    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<'_, S, M>> {
         let mut labels = Vec::new();
         for label in self.labels.iter() {
             let label_source = label.span.source();
@@ -130,7 +132,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             labels.push((label_info, label_source));
         }
         labels.sort_by_key(|(l, _)| (l.display_info.order, l.end_line, l.start_line));
-        let mut groups = Vec::<SourceGroup<_>>::new();
+        let mut groups = Vec::<SourceGroup<_, M>>::new();
         for (label, src_id) in labels {
             match groups.last_mut() {
                 Some(group)
@@ -294,9 +296,9 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 )?;
             }
 
-            struct LineLabel<'a> {
+            struct LineLabel<'a, M: Message> {
                 col: usize,
-                label: &'a LabelInfo<'a>,
+                label: &'a LabelInfo<'a, M>,
                 multi: Option<usize>,
                 draw_msg: bool,
             }
@@ -342,8 +344,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 is_ellipsis: bool,
                                 draw_labels: bool,
                                 report_row: Option<(usize, bool)>,
-                                line_labels: &[LineLabel],
-                                margin_label: &Option<LineLabel>|
+                                line_labels: &[LineLabel<M>],
+                                margin_label: &Option<LineLabel<M>>|
              -> std::io::Result<()> {
                 let line_no_margin = if is_line && !is_ellipsis {
                     let line_no = format!("{}", idx + 1);
@@ -380,8 +382,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         + (!multi_labels_with_message.is_empty()) as usize
                     {
                         let mut corner = None;
-                        let mut hbar: Option<&LabelInfo> = None;
-                        let mut vbar: Option<&LabelInfo> = None;
+                        let mut hbar: Option<&LabelInfo<M>> = None;
+                        let mut vbar: Option<&LabelInfo<M>> = None;
                         let mut margin_ptr = None;
 
                         let multi_label = multi_labels_with_message.get(col);
@@ -908,7 +910,15 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
                     }
                     if line_label.draw_msg {
-                        write!(w, " {}", Show(line_label.label.display_info.msg.as_ref()))?;
+                        let info = &line_label.label.display_info;
+                        let display = (|| {
+                            Some(DisplayMessage {
+                                m: RefMessage(info.msg.as_ref()?),
+                                color: info.color(&self.config),
+                                with_style: self.config.color,
+                            })
+                        })();
+                        write!(w, " {}", Show(display))?;
                     }
                     writeln!(w)?;
                 }
