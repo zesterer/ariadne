@@ -133,12 +133,12 @@ struct LabelDisplay {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Label<S = Range<usize>> {
     span: S,
+    replacement: Option<String>,
     display_info: LabelDisplay,
 }
 
 impl<S: Span> Label<S> {
     /// Create a new [`Label`].
-    /// If the span is specified as a `Range<usize>` the numbers have to be zero-indexed character offsets.
     ///
     /// # Panics
     ///
@@ -148,6 +148,7 @@ impl<S: Span> Label<S> {
 
         Self {
             span,
+            replacement: None,
             display_info: LabelDisplay {
                 msg: None,
                 color: None,
@@ -195,6 +196,14 @@ impl<S: Span> Label<S> {
     /// function to override this behaviour.
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.display_info.priority = priority;
+        self
+    }
+
+    /// Have this label suggest a replacement for the source code within its span.
+    ///
+    /// Suggestions are displayed after any trailing help messages.
+    pub fn with_suggested_replacement<R: ToString>(mut self, replacement: R) -> Self {
+        self.replacement = Some(replacement.to_string());
         self
     }
 }

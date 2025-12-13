@@ -265,6 +265,16 @@ impl<I: AsRef<str>> Source<I> {
     pub fn get_line_text(&self, line: Line) -> Option<&'_ str> {
         self.text.as_ref().get(line.byte_span())
     }
+
+    pub(crate) fn as_string(&self) -> Source<String> {
+        Source {
+            text: self.text.as_ref().to_string(),
+            lines: self.lines.clone(), // TODO: Don't
+            len: self.len,
+            byte_len: self.byte_len,
+            display_line_offset: self.display_line_offset,
+        }
+    }
 }
 
 impl<I: AsRef<str>> Cache<()> for Source<I> {
