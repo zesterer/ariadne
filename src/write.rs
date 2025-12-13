@@ -759,8 +759,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 // Arrows
                 for row in 0..line_labels.len() {
                     let line_label = &line_labels[row];
-                    if (line_label.label.display_info.msg.is_some() || row == 0)
-                        && !self.config.compact
+                    if row == 0
+                        || (line_label.label.display_info.msg.is_some() && !self.config.compact)
                     {
                         // Margin alternate
                         write_margin(
@@ -783,19 +783,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                             let underline = get_underline(col).filter(|_| row == 0);
                             let [c, tail] = if let Some(vbar_ll) = vbar {
                                 let [c, tail] = if underline.is_some() {
-                                    // TODO: Is this good?
-                                    // The `true` is used here because it's temporarily disabling a
-                                    // feature that might be reenabled later.
-                                    #[allow(clippy::overly_complex_bool_expr)]
-                                    if ExactSizeIterator::len(&vbar_ll.label.char_span) <= 1 || true
-                                    {
-                                        [draw.underbar, draw.underline]
+                                    if ExactSizeIterator::len(&vbar_ll.label.char_span) <= 1 {
+                                        [draw.underbar_single, draw.underline]
                                     } else if line.offset() + col == vbar_ll.label.char_span.start {
-                                        [draw.ltop, draw.underbar]
+                                        [draw.lunderbar, draw.munderbar]
                                     } else if line.offset() + col == vbar_ll.label.last_offset() {
-                                        [draw.rtop, draw.underbar]
+                                        [draw.runderbar, draw.munderbar]
                                     } else {
-                                        [draw.underbar, draw.underline]
+                                        [draw.munderbar, draw.underline]
                                     }
                                 } else if vbar_ll.multi.is_some()
                                     && row == 0
@@ -877,7 +872,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 ]
                             } else {
                                 [
-                                    if vbar_ll.multi.is_some() && row == 0 && self.config.compact {
+                                    if vbar_ll.multi.is_some()
+                                        && row == 0
+                                        && self.config.compact
+                                        && false
+                                    {
                                         draw.uarrow
                                     } else {
                                         draw.vbar
