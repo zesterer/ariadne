@@ -12,6 +12,7 @@ pub use crate::{
     draw::{ColorGenerator, Fmt},
     source::{sources, Cache, FileCache, FnCache, Line, Source},
 };
+use std::sync::Arc;
 pub use yansi::Color;
 
 #[cfg(any(feature = "concolor", doc))]
@@ -120,20 +121,232 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, RangeInclus
     }
 }
 
+/// A trait for messages like raw strings or styled strings
+/// note that display should be implemnted without style
+pub trait Message {
+    /// what to render in the report
+    fn render(&self, f: &mut fmt::Formatter, with_style: bool, color: Option<Color>)
+        -> fmt::Result;
+}
+
+/// an object that can be styled
+pub trait Styleble<Style, Output> {
+    /// apply style to this type
+    fn with_style(self, s: Style) -> Output;
+}
+
+/// simple message that can be used for rendring
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct BasicMessage(String);
+
+impl<T: ToString> From<T> for BasicMessage {
+    fn from(s: T) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl Message for BasicMessage {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        _with_style: bool,
+        color: Option<Color>,
+    ) -> fmt::Result {
+        match color {
+            Some(c) => write!(f, "{}", self.0.as_str().fg(c)),
+            None => write!(f, "{}", self.0),
+        }
+    }
+}
+
+/// simple colored message that can be used for rendring
+/// the color takes precednce over defualt color
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct ColoredMessage(String, Option<Color>);
+
+impl Message for ColoredMessage {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        with_style: bool,
+        _color: Option<Color>,
+    ) -> fmt::Result {
+        match self.1.filter(|_| with_style) {
+            Some(c) => write!(f, "{}", self.0.as_str().fg(c)),
+            None => write!(f, "{}", self.0),
+        }
+    }
+}
+
+impl Styleble<Color, ColoredMessage> for String {
+    fn with_style(self, c: Color) -> ColoredMessage {
+        ColoredMessage(self, Some(c))
+    }
+}
+
+impl Styleble<Option<Color>, ColoredMessage> for String {
+    fn with_style(self, c: Option<Color>) -> ColoredMessage {
+        ColoredMessage(self, c)
+    }
+}
+
+/// a wrapper type for functions that can be used with `FuncMessage`
+pub type ArcMessage = Arc<dyn Fn(&mut fmt::Formatter, bool, Option<Color>) -> fmt::Result>;
+
+/// A message captured through a closure
+/// this is useful for when you want a more elaborate message
+/// the output of format_text is currently this type
+#[derive(Clone)]
+pub struct FuncMessage(ArcMessage);
+impl Message for FuncMessage {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        with_style: bool,
+        color: Option<Color>,
+    ) -> fmt::Result {
+        self.0(f, with_style, color)
+    }
+}
+
+// impl FuncMessage {
+//     fn new(x: ArcMessage) -> Self {
+//         Self(x.into())
+//     }
+// }
+
+/// A message taken by refrence useful for when you need Copy
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct RefMessage<'a, M: Message>(pub &'a M);
+impl<M: Message> Message for RefMessage<'_, M> {
+    fn render(
+        &self,
+        f: &mut fmt::Formatter,
+        with_style: bool,
+        color: Option<Color>,
+    ) -> fmt::Result {
+        self.0.render(f, with_style, color)
+    }
+}
+
+impl<M: Message> Clone for RefMessage<'_, M> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<M: Message> Copy for RefMessage<'_, M> {}
+
+#[doc(hidden)]
+pub(crate) struct DisplayMessage<M: Message> {
+    m: M,
+    with_style: bool,
+    color: Option<Color>,
+}
+
+impl<M: Message> Display for DisplayMessage<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.m.render(f, self.with_style, self.color)
+    }
+}
+
+/// format text into `FuncMessage` that can then be displayed
+/// this is just syntax sugar around making a function
+#[macro_export]
+macro_rules! format_text {
+    ($fmt:literal $(, $arg:expr)* $(,)?) => {{
+        $crate::FuncMessage(std::sync::Arc::new(move |f: &mut std::fmt::Formatter<'_>,
+                                     with_style: bool,
+                                     color: Option<$crate::Color>| {
+            write!(
+                f,
+                $fmt,
+                $( DisplayMessage {
+                        m: RefMessage(&$arg),
+                        with_style,
+                        color
+                  } ),*
+            )
+        }))
+    }};
+}
+
+#[test]
+fn format_text_no_style() {
+    use yansi::Color;
+
+    let msg = "hello".to_string().with_style(Color::Red);
+    let m = format_text!("test: {}", msg);
+
+    let out = format!(
+        "{}",
+        DisplayMessage {
+            m,
+            with_style: false,
+            color: None,
+        }
+    );
+
+    assert_eq!(out, "test: hello");
+}
+
+#[test]
+fn format_text_emits_red_ansi() {
+    let msg = "hello".to_string().with_style(Color::Red);
+    let m = format_text!("X {} X", msg);
+
+    let out = format!(
+        "{}",
+        DisplayMessage {
+            m,
+            with_style: true,
+            color: None,
+        }
+    );
+
+    let expected = format!("X {} X", "\x1b[31mhello\x1b[0m");
+
+    assert_eq!(out, expected);
+}
+
+// /// complex message capable of printing anything
+// #[derive(Clone,Debug)]
+// pub enum RitchMessage{
+//     /// just a simple string
+//     Basic(BasicMessage),
+
+//     /// custom functions that can render anything
+//     Custom(Arc<dyn Message>)
+// }
+
+// impl Message for RitchMessage {
+// fn render(&self,f: &mut fmt::Formatter,with_style:bool,color:Option<Color>) -> fmt::Result{
+//     match self {
+//         RitchMessage::Basic(x)=>x.render(f,with_style,color),
+//         RitchMessage::Custom(x)=>x.render(f,with_style,color),
+//     }
+// }
+// }
+
 /// A type that represents the way a label should be displayed.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-struct LabelDisplay {
-    msg: Option<String>,
-    color: Option<Color>,
+struct LabelDisplay<M: Message> {
+    msg: Option<M>,
+    raw_color: Option<Color>,
     order: i32,
     priority: i32,
 }
 
+impl<M: Message> LabelDisplay<M> {
+    fn color(&self, config: &Config) -> Option<Color> {
+        self.raw_color.filter(|_| config.color)
+    }
+}
+
 /// A type that represents a labelled section of source code.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Label<S = Range<usize>> {
+pub struct Label<S = Range<usize>, M: Message = BasicMessage> {
     span: S,
-    display_info: LabelDisplay,
+    display_info: LabelDisplay<M>,
 }
 
 impl<S: Span> Label<S> {
@@ -144,13 +357,25 @@ impl<S: Span> Label<S> {
     ///
     /// Panics if the given span is backwards.
     pub fn new(span: S) -> Self {
+        Self::new_generic(span)
+    }
+}
+
+impl<S: Span, M: Message> Label<S, M> {
+    /// Create a new [`Label`].
+    /// If the span is specified as a `Range<usize>` the numbers have to be zero-indexed character offsets.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given span is backwards.
+    pub fn new_generic(span: S) -> Self {
         assert!(span.start() <= span.end(), "Label start is after its end");
 
         Self {
             span,
             display_info: LabelDisplay {
                 msg: None,
-                color: None,
+                raw_color: None,
                 order: 0,
                 priority: 0,
             },
@@ -158,14 +383,14 @@ impl<S: Span> Label<S> {
     }
 
     /// Give this label a message.
-    pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
-        self.display_info.msg = Some(msg.to_string());
+    pub fn with_message<V: Into<M>>(mut self, msg: V) -> Self {
+        self.display_info.msg = Some(msg.into());
         self
     }
 
     /// Give this label a highlight colour.
     pub fn with_color(mut self, color: Color) -> Self {
-        self.display_info.color = Some(color);
+        self.display_info.raw_color = Some(color);
         self
     }
 
@@ -200,22 +425,22 @@ impl<S: Span> Label<S> {
 }
 
 /// A type representing a diagnostic that is ready to be written to output.
-pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind> {
+pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind, M: Message = BasicMessage> {
     kind: K,
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
     help: Vec<String>,
     span: S,
-    labels: Vec<Label<S>>,
+    labels: Vec<Label<S, M>>,
     config: Config,
 }
 
-impl<S: Span, K: ReportStyle> Report<S, K> {
+impl<S: Span, K: ReportStyle, M: Message> Report<S, K, M> {
     /// Begin building a new [`Report`].
     ///
     /// The span is the primary location at which the error should be reported.
-    pub fn build(kind: K, span: S) -> ReportBuilder<S, K> {
+    pub fn build(kind: K, span: S) -> ReportBuilder<S, K, M> {
         ReportBuilder {
             kind,
             code: None,
@@ -339,18 +564,18 @@ impl ReportStyle for ReportKind {
 }
 
 /// A type used to build a [`Report`].
-pub struct ReportBuilder<S: Span, K: ReportStyle> {
+pub struct ReportBuilder<S: Span, K: ReportStyle, M: Message> {
     kind: K,
     code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
     help: Vec<String>,
     span: S,
-    labels: Vec<Label<S>>,
+    labels: Vec<Label<S, M>>,
     config: Config,
 }
 
-impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
+impl<S: Span, K: ReportStyle, M: Message> ReportBuilder<S, K, M> {
     /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
     pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
         self.code = Some(format!("{code:02}"));
@@ -358,12 +583,12 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 
     /// Set the message of this report.
-    pub fn set_message<M: ToString>(&mut self, msg: M) {
+    pub fn set_message<V: ToString>(&mut self, msg: V) {
         self.msg = Some(msg.to_string());
     }
 
     /// Add a message to this report.
-    pub fn with_message<M: ToString>(mut self, msg: M) -> Self {
+    pub fn with_message<V: ToString>(mut self, msg: V) -> Self {
         self.msg = Some(msg.to_string());
         self
     }
@@ -415,27 +640,23 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 
     /// Add a label to the report.
-    pub fn add_label(&mut self, label: Label<S>) {
+    pub fn add_label(&mut self, label: Label<S, M>) {
         self.add_labels(std::iter::once(label));
     }
 
     /// Add multiple labels to the report.
-    pub fn add_labels<L: IntoIterator<Item = Label<S>>>(&mut self, labels: L) {
-        let config = &self.config; // This would not be necessary in Rust 2021 edition
-        self.labels.extend(labels.into_iter().map(|mut label| {
-            label.display_info.color = config.filter_color(label.display_info.color);
-            label
-        }));
+    pub fn add_labels<L: IntoIterator<Item = Label<S, M>>>(&mut self, labels: L) {
+        self.labels.extend(labels);
     }
 
     /// Add a label to the report.
-    pub fn with_label(mut self, label: Label<S>) -> Self {
+    pub fn with_label(mut self, label: Label<S, M>) -> Self {
         self.add_label(label);
         self
     }
 
     /// Add multiple labels to the report.
-    pub fn with_labels<L: IntoIterator<Item = Label<S>>>(mut self, labels: L) -> Self {
+    pub fn with_labels<L: IntoIterator<Item = Label<S, M>>>(mut self, labels: L) -> Self {
         self.add_labels(labels);
         self
     }
@@ -447,7 +668,7 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 
     /// Finish building the [`Report`].
-    pub fn finish(self) -> Report<S, K> {
+    pub fn finish(self) -> Report<S, K, M> {
         Report {
             kind: self.kind,
             code: self.code,
@@ -461,7 +682,7 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     }
 }
 
-impl<S: Span, K: ReportStyle> fmt::Debug for ReportBuilder<S, K> {
+impl<S: Span, K: ReportStyle, M: Message + Debug> fmt::Debug for ReportBuilder<S, K, M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)
@@ -504,15 +725,6 @@ pub enum IndexType {
     Char,
 }
 
-/// Whether rendering of ANSI styling, such as color and font weight, is enabled.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AnsiMode {
-    /// ANSI styling is disabled, diagnostics will display without styling.
-    Off,
-    /// ANSI styling is disabled, diagnostics will have ANSI styling escape codes included.
-    On,
-}
-
 /// A type used to configure a report
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Config {
@@ -527,7 +739,6 @@ pub struct Config {
     index_type: IndexType,
     minimise_crossings: bool,
     context_lines: usize,
-    ansi_mode: AnsiMode,
 }
 
 impl Config {
@@ -612,13 +823,6 @@ impl Config {
         self.context_lines = context_lines;
         self
     }
-    /// Should ANSI escape code styling be included in the diagnostic after writing?
-    ///
-    /// If unspecified, this defaults to `AnsiMode::On`.
-    pub const fn with_ansi_mode(mut self, ansi_mode: AnsiMode) -> Self {
-        self.ansi_mode = ansi_mode;
-        self
-    }
 
     fn error_color(&self) -> Option<Color> {
         Some(Color::Red).filter(|_| self.color)
@@ -640,9 +844,6 @@ impl Config {
     }
     fn note_color(&self) -> Option<Color> {
         Some(Color::Fixed(115)).filter(|_| self.color)
-    }
-    fn filter_color(&self, color: Option<Color>) -> Option<Color> {
-        color.filter(|_| self.color)
     }
 
     // Find the character that should be drawn and the number of times it should be drawn for each char
@@ -672,7 +873,6 @@ impl Config {
             index_type: IndexType::Char,
             minimise_crossings: false,
             context_lines: 0,
-            ansi_mode: AnsiMode::On,
         }
     }
 }
@@ -687,5 +887,5 @@ impl Default for Config {
 #[should_panic]
 #[allow(clippy::reversed_empty_ranges)]
 fn backwards_label_should_panic() {
-    Label::new(1..0);
+    Label::<Range<usize>, BasicMessage>::new(1..0);
 }

@@ -225,37 +225,6 @@ impl<T: fmt::Display> fmt::Display for Background<T> {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum WrappedWriter<W: Write> {
-    Strip(strip_ansi_escapes::Writer<W>),
-    Keep(W),
-}
-
-impl<W: Write> WrappedWriter<W> {
-    pub(crate) fn new(w: W, config: &Config) -> Self {
-        match config.ansi_mode {
-            AnsiMode::Off => Self::Strip(strip_ansi_escapes::Writer::new(w)),
-            AnsiMode::On => Self::Keep(w),
-        }
-    }
-}
-
-impl<W: Write> Write for WrappedWriter<W> {
-    fn flush(&mut self) -> io::Result<()> {
-        match self {
-            Self::Strip(w) => w.flush(),
-            Self::Keep(w) => w.flush(),
-        }
-    }
-
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            Self::Strip(w) => w.write(buf),
-            Self::Keep(w) => w.write(buf),
-        }
-    }
-}
-
 /// A type that can generate distinct 8-bit colors.
 pub struct ColorGenerator {
     state: [u16; 3],

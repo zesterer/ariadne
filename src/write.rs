@@ -1,10 +1,12 @@
 use std::io;
 use std::ops::Range;
 
-use crate::{Config, IndexType, LabelDisplay};
+use crate::{Config, IndexType, LabelDisplay, Message};
 
-use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
-use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Show, Span, Write};
+use super::draw::{self, StreamAwareFmt, StreamType};
+use super::{
+    Cache, CharSet, DisplayMessage, LabelAttach, RefMessage, Report, ReportStyle, Show, Span, Write,
+};
 
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
 //
@@ -19,16 +21,16 @@ enum LabelKind {
     Multiline,
 }
 
-struct LabelInfo<'a> {
+struct LabelInfo<'a, M: Message> {
     kind: LabelKind,
     char_span: Range<usize>,
-    display_info: &'a LabelDisplay,
+    display_info: &'a LabelDisplay<M>,
     #[allow(dead_code)]
     start_line: usize,
     end_line: usize,
 }
 
-impl LabelInfo<'_> {
+impl<M: Message> LabelInfo<'_, M> {
     fn last_offset(&self) -> usize {
         self.char_span
             .end
@@ -42,15 +44,15 @@ impl LabelInfo<'_> {
     }
 }
 
-struct SourceGroup<'a, S: Span> {
+struct SourceGroup<'a, S: Span, M: Message> {
     src_id: &'a S::SourceId,
     char_span: Range<usize>,
     display_range: Range<usize>,
-    labels: Vec<LabelInfo<'a>>,
+    labels: Vec<LabelInfo<'a, M>>,
 }
 
-impl<S: Span, K: ReportStyle> Report<S, K> {
-    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<'_, S>> {
+impl<S: Span, K: ReportStyle, M: Message> Report<S, K, M> {
+    fn get_source_groups(&self, cache: &mut impl Cache<S::SourceId>) -> Vec<SourceGroup<'_, S, M>> {
         let mut labels = Vec::new();
         for label in self.labels.iter() {
             let label_source = label.span.source();
@@ -130,7 +132,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             labels.push((label_info, label_source));
         }
         labels.sort_by_key(|(l, _)| (l.display_info.order, l.end_line, l.start_line));
-        let mut groups = Vec::<SourceGroup<_>>::new();
+        let mut groups = Vec::<SourceGroup<_, M>>::new();
         for (label, src_id) in labels {
             match groups.last_mut() {
                 Some(group)
@@ -185,10 +187,9 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
     fn write_for_stream<C: Cache<S::SourceId>, W: Write>(
         &self,
         mut cache: C,
-        w: W,
+        mut w: W,
         s: StreamType,
     ) -> io::Result<()> {
-        let mut w = WrappedWriter::new(w, &self.config);
         let draw = match self.config.char_set {
             CharSet::Unicode => draw::Characters::unicode(),
             CharSet::Ascii => draw::Characters::ascii(),
@@ -198,7 +199,10 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
         let code = self.code.as_ref().map(|c| format!("[{c}] "));
         let id = format!("{}{}:", Show(code), self.kind);
-        let kind_color = self.kind.get_color(&self.config);
+        let kind_color = self
+            .kind
+            .get_color(&self.config)
+            .filter(|_| self.config.color);
         writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
 
         let groups = self.get_source_groups(&mut cache);
@@ -292,9 +296,9 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 )?;
             }
 
-            struct LineLabel<'a> {
+            struct LineLabel<'a, M: Message> {
                 col: usize,
-                label: &'a LabelInfo<'a>,
+                label: &'a LabelInfo<'a, M>,
                 multi: Option<usize>,
                 draw_msg: bool,
             }
@@ -334,14 +338,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 multi_labels_with_message.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
             }
 
-            let write_margin = |w: &mut WrappedWriter<W>,
+            let write_margin = |w: &mut W,
                                 idx: usize,
                                 is_line: bool,
                                 is_ellipsis: bool,
                                 draw_labels: bool,
                                 report_row: Option<(usize, bool)>,
-                                line_labels: &[LineLabel],
-                                margin_label: &Option<LineLabel>|
+                                line_labels: &[LineLabel<M>],
+                                margin_label: &Option<LineLabel<M>>|
              -> std::io::Result<()> {
                 let line_no_margin = if is_line && !is_ellipsis {
                     let line_no = format!("{}", idx + 1);
@@ -378,8 +382,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         + (!multi_labels_with_message.is_empty()) as usize
                     {
                         let mut corner = None;
-                        let mut hbar: Option<&LabelInfo> = None;
-                        let mut vbar: Option<&LabelInfo> = None;
+                        let mut hbar: Option<&LabelInfo<M>> = None;
+                        let mut vbar: Option<&LabelInfo<M>> = None;
                         let mut margin_ptr = None;
 
                         let multi_label = multi_labels_with_message.get(col);
@@ -461,17 +465,17 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         let (a, b) = if let Some((label, is_start)) = corner {
                             (
                                 if is_start { draw.ltop } else { draw.lbot }
-                                    .fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
+                                    .fg(label.display_info.color(&self.config), s),
+                                draw.hbar.fg(label.display_info.color(&self.config), s),
                             )
                         } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
                             (
                                 if self.config.cross_gap {
-                                    draw.vbar.fg(v_label.display_info.color, s)
+                                    draw.vbar.fg(v_label.display_info.color(&self.config), s)
                                 } else {
-                                    draw.xbar.fg(v_label.display_info.color, s)
+                                    draw.xbar.fg(v_label.display_info.color(&self.config), s)
                                 },
-                                draw.hbar.fg(h_label.display_info.color, s),
+                                draw.hbar.fg(h_label.display_info.color(&self.config), s),
                             )
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
                             let is_col =
@@ -493,14 +497,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 } else {
                                     draw.hbar
                                 }
-                                .fg(margin.label.display_info.color, s),
+                                .fg(margin.label.display_info.color(&self.config), s),
                                 if !is_limit { draw.hbar } else { ' ' }
-                                    .fg(margin.label.display_info.color, s),
+                                    .fg(margin.label.display_info.color(&self.config), s),
                             )
                         } else if let Some(label) = hbar {
                             (
-                                draw.hbar.fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
+                                draw.hbar.fg(label.display_info.color(&self.config), s),
+                                draw.hbar.fg(label.display_info.color(&self.config), s),
                             )
                         } else if let Some(label) = vbar {
                             (
@@ -509,7 +513,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 } else {
                                     draw.vbar
                                 }
-                                .fg(label.display_info.color, s),
+                                .fg(label.display_info.color(&self.config), s),
                                 ' '.fg(None, s),
                             )
                         } else {
@@ -740,7 +744,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         .enumerate()
                     {
                         let color = if let Some(highlight) = get_highlight(col) {
-                            highlight.display_info.color
+                            highlight.display_info.color(&self.config)
                         } else {
                             self.config.unimportant_color()
                         };
@@ -801,11 +805,13 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                     [draw.vbar, ' ']
                                 };
                                 [
-                                    c.fg(vbar_ll.label.display_info.color, s),
-                                    tail.fg(vbar_ll.label.display_info.color, s),
+                                    c.fg(vbar_ll.label.display_info.color(&self.config), s),
+                                    tail.fg(vbar_ll.label.display_info.color(&self.config), s),
                                 ]
                             } else if let Some(underline_ll) = underline {
-                                [draw.underline.fg(underline_ll.label.display_info.color, s); 2]
+                                [draw.underline
+                                    .fg(underline_ll.label.display_info.color(&self.config), s);
+                                    2]
                             } else {
                                 [' '.fg(None, s); 2]
                             };
@@ -859,16 +865,18 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                 } else {
                                     draw.lbot
                                 }
-                                .fg(line_label.label.display_info.color, s),
-                                draw.hbar.fg(line_label.label.display_info.color, s),
+                                .fg(line_label.label.display_info.color(&self.config), s),
+                                draw.hbar
+                                    .fg(line_label.label.display_info.color(&self.config), s),
                             ]
                         } else if let Some(vbar_ll) = get_vbar(col, row).filter(|_| {
                             col != line_label.col || line_label.label.display_info.msg.is_some()
                         }) {
                             if !self.config.cross_gap && is_hbar {
                                 [
-                                    draw.xbar.fg(vbar_ll.label.display_info.color, s),
-                                    ' '.fg(line_label.label.display_info.color, s),
+                                    draw.xbar
+                                        .fg(vbar_ll.label.display_info.color(&self.config), s),
+                                    ' '.fg(line_label.label.display_info.color(&self.config), s),
                                 ]
                             } else {
                                 [
@@ -881,12 +889,14 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                     } else {
                                         draw.vbar
                                     }
-                                    .fg(vbar_ll.label.display_info.color, s),
-                                    ' '.fg(line_label.label.display_info.color, s),
+                                    .fg(vbar_ll.label.display_info.color(&self.config), s),
+                                    ' '.fg(line_label.label.display_info.color(&self.config), s),
                                 ]
                             }
                         } else if is_hbar {
-                            [draw.hbar.fg(line_label.label.display_info.color, s); 2]
+                            [draw.hbar
+                                .fg(line_label.label.display_info.color(&self.config), s);
+                                2]
                         } else {
                             [' '.fg(None, s); 2]
                         };
@@ -899,7 +909,15 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
                     }
                     if line_label.draw_msg {
-                        write!(w, " {}", Show(line_label.label.display_info.msg.as_ref()))?;
+                        let info = &line_label.label.display_info;
+                        let display = (|| {
+                            Some(DisplayMessage {
+                                m: RefMessage(info.msg.as_ref()?),
+                                color: info.color(&self.config),
+                                with_style: self.config.color,
+                            })
+                        })();
+                        write!(w, " {}", Show(display))?;
                     }
                     writeln!(w)?;
                 }
