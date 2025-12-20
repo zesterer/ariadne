@@ -1,7 +1,7 @@
 use std::io;
 use std::ops::Range;
 
-use crate::{Config, IndexType, LabelDisplay};
+use crate::{Config, IndexType, LabelCollapseLines, LabelDisplay};
 
 use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
 use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Show, Span, Write};
@@ -626,7 +626,20 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         .iter()
                         .any(|label| label.char_span.contains(&line.span().start()));
                     if !is_ellipsis && within_label {
-                        is_ellipsis = true;
+                        // Check to see if all the multiline labels containing this line use ellipses
+                        let should_collapse = multi_labels
+                            .iter()
+                            .filter(|label| label.char_span.contains(&line.span().start()))
+                            .all(|label| match label.display_info.collapse_when {
+                                LabelCollapseLines::Always => true,
+                                LabelCollapseLines::MaxLines(max_lines) => {
+                                    label.end_line - label.start_line >= max_lines
+                                }
+                                LabelCollapseLines::Never => false,
+                            });
+                        if should_collapse {
+                            is_ellipsis = true;
+                        }
                     } else {
                         if !self.config.compact && !is_ellipsis {
                             write_margin(&mut w, idx, false, is_ellipsis, false, None, &[], &None)?;
@@ -1000,7 +1013,8 @@ mod tests {
     use insta::assert_snapshot;
 
     use crate::{
-        Cache, CharSet, Config, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
+        Cache, CharSet, Config, IndexType, Label, LabelCollapseLines, Report, ReportKind,
+        ReportStyle, Source, Span,
     };
 
     impl<S: Span, K: ReportStyle> Report<S, K> {
@@ -1403,6 +1417,60 @@ mod tests {
            | `----------- illegal comparison
         ---'
         "###);
+    }
+
+    #[test]
+    fn multiline_label_show_3() {
+        let source = "pear\napple\n==\norange\nbanana";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_label(
+                    Label::new(5..20)
+                        .with_message("illegal comparison")
+                        .with_collapse_lines_when(LabelCollapseLines::MaxLines(3)),
+                )
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r"
+        Error:
+           ,-[ <unknown>:1:1 ]
+           |
+         2 | ,-> apple
+         3 | |   ==
+         4 | |-> orange
+           | |
+           | `------------ illegal comparison
+        ---'
+        ");
+    }
+
+    #[test]
+    fn multiline_label_longer_than_max_span_line_count() {
+        let source = "pear\napple\n==\norange\nbanana";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_label(
+                    Label::new(5..source.len())
+                        .with_message("illegal comparison")
+                        .with_collapse_lines_when(LabelCollapseLines::MaxLines(3)),
+                )
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r"
+        Error:
+           ,-[ <unknown>:1:1 ]
+           |
+         2 | ,-> apple
+           : :
+         5 | |-> banana
+           | |
+           | `----------- illegal comparison
+        ---'
+        ");
     }
 
     #[test]
