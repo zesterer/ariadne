@@ -210,7 +210,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         let groups = self.get_source_groups(&mut cache);
 
         // Line number maximum width
-        let line_num_width = max_line_num(&groups, &mut cache).map_or(0, nb_digits);
+        let line_num_width = max_line_num(&groups).map_or(0, nb_digits);
 
         let margin_char = |c: char| c.fg(self.config.margin_color(), s);
 
@@ -969,10 +969,7 @@ fn display_name<Id: ?Sized, C: Cache<Id>>(cache: &C, src_id: &Id) -> String {
         .unwrap_or_else(|| "<unknown>".to_string())
 }
 
-fn max_line_num<S: Span, C: Cache<S::SourceId>>(
-    groups: &[SourceGroup<'_, S>],
-    cache: &mut C,
-) -> Option<usize> {
+fn max_line_num<S: Span>(groups: &[SourceGroup<'_, S>]) -> Option<usize> {
     groups
         .iter()
         .map(|group| nb_digits(group.display_range.end))
