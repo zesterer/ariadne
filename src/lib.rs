@@ -120,6 +120,17 @@ impl<Id: fmt::Debug + Hash + PartialEq + Eq + ToOwned> Span for (Id, RangeInclus
     }
 }
 
+/// A type that describes when a multiline label should hide its contents with ellipses
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum LabelCollapseLines {
+    /// Hides the contents of the label with ellipses if it is over the line limit
+    MaxLines(usize),
+    /// Always hides contents of multiline labels with ellipses
+    Always,
+    /// Always show the entire label contents (never use ellipses)
+    Never,
+}
+
 /// A type that represents the way a label should be displayed.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct LabelDisplay {
@@ -127,6 +138,7 @@ struct LabelDisplay {
     color: Option<Color>,
     order: i32,
     priority: i32,
+    collapse_when: LabelCollapseLines,
 }
 
 /// A type that represents a labelled section of source code.
@@ -153,6 +165,7 @@ impl<S: Span> Label<S> {
                 color: None,
                 order: 0,
                 priority: 0,
+                collapse_when: LabelCollapseLines::Always,
             },
         }
     }
@@ -195,6 +208,14 @@ impl<S: Span> Label<S> {
     /// function to override this behaviour.
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.display_info.priority = priority;
+        self
+    }
+
+    /// Specify when the label should hide multiline contents with ellipses
+    ///
+    /// If unspecified, defaults to always collapsing multiline labels with `LabelCollapseLines::Always`
+    pub fn with_collapse_lines_when(mut self, collapse_when: LabelCollapseLines) -> Self {
+        self.display_info.collapse_when = collapse_when;
         self
     }
 }
