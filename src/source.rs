@@ -208,7 +208,7 @@ impl<I: AsRef<str>> Source<I> {
     /// Get the line that the given offset appears on, and the line/column numbers of the offset.
     ///
     /// Note that the line/column numbers are zero-indexed.
-    pub fn get_offset_line(&self, offset: usize) -> Option<(Line, usize, usize)> {
+    pub fn get_offset_line(&self, offset: usize) -> Option<Location> {
         if offset <= self.len {
             let idx = self
                 .lines
@@ -221,7 +221,11 @@ impl<I: AsRef<str>> Source<I> {
                 offset,
                 line.offset
             );
-            Some((line, idx, offset - line.offset))
+            Some(Location {
+                line,
+                line_idx: idx,
+                col_idx: offset - line.offset,
+            })
         } else {
             None
         }
@@ -230,7 +234,7 @@ impl<I: AsRef<str>> Source<I> {
     /// Get the line that the given byte offset appears on, and the line/byte column numbers of the offset.
     ///
     /// Note that the line/column numbers are zero-indexed.
-    pub fn get_byte_line(&self, byte_offset: usize) -> Option<(Line, usize, usize)> {
+    pub fn get_byte_line(&self, byte_offset: usize) -> Option<Location> {
         if byte_offset <= self.byte_len {
             let idx = self
                 .lines
@@ -243,7 +247,11 @@ impl<I: AsRef<str>> Source<I> {
                 byte_offset,
                 line.byte_offset
             );
-            Some((line, idx, byte_offset - line.byte_offset))
+            Some(Location {
+                line,
+                line_idx: idx,
+                col_idx: byte_offset - line.byte_offset,
+            })
         } else {
             None
         }
@@ -254,10 +262,12 @@ impl<I: AsRef<str>> Source<I> {
     /// The resulting range is guaranteed to contain valid line indices (i.e: those that can be used for
     /// [`Source::line`]).
     pub fn get_line_range<S: Span>(&self, span: &S) -> Range<usize> {
-        let start = self.get_offset_line(span.start()).map_or(0, |(_, l, _)| l);
+        let start = self
+            .get_offset_line(span.start())
+            .map_or(0, |location| location.line_idx);
         let end = self
             .get_offset_line(span.end().saturating_sub(1).max(span.start()))
-            .map_or(self.lines.len(), |(_, l, _)| l + 1);
+            .map_or(self.lines.len(), |location| location.line_idx + 1);
         start..end
     }
 
@@ -265,6 +275,13 @@ impl<I: AsRef<str>> Source<I> {
     pub fn get_line_text(&self, line: Line) -> Option<&'_ str> {
         self.text.as_ref().get(line.byte_span())
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Location {
+    pub line: Line,
+    pub line_idx: usize,
+    pub col_idx: usize,
 }
 
 impl<I: AsRef<str>> Cache<()> for Source<I> {

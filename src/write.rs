@@ -1,10 +1,12 @@
+use std::fmt::Display;
 use std::io;
 use std::ops::Range;
 
-use crate::{Config, IndexType, LabelDisplay};
+use crate::source::Location;
+use crate::{Config, IndexType, LabelDisplay, Source};
 
 use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
-use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Show, Span, Write};
+use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Rept, Show, Span, Write};
 
 // A WARNING, FOR ALL YE WHO VENTURE IN HERE
 //
@@ -55,13 +57,8 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         for label in self.labels.iter() {
             let label_source = label.span.source();
 
-            let src_display = cache.display(label_source);
-            let src = match cache.fetch(label_source) {
-                Ok(src) => src,
-                Err(err) => {
-                    eprintln!("Unable to fetch source '{}': {:?}", Show(src_display), err);
-                    continue;
-                }
+            let Some((src, _src_name)) = fetch_source(cache, label_source) else {
+                continue;
             };
 
             let given_label_span = label.span.start()..label.span.end();
@@ -72,45 +69,50 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         continue;
                     };
                     let end_line = if given_label_span.start >= given_label_span.end {
-                        start_line.1
+                        start_line.line_idx
                     } else {
                         let Some(end_line) = src.get_offset_line(given_label_span.end - 1) else {
                             continue;
                         };
-                        end_line.1
+                        end_line.line_idx
                     };
-                    (given_label_span, start_line.1, end_line)
+                    (given_label_span, start_line.line_idx, end_line)
                 }
                 IndexType::Byte => {
-                    let Some((start_line_obj, start_line, start_byte_col)) =
-                        src.get_byte_line(given_label_span.start)
-                    else {
+                    let Some(start_location) = src.get_byte_line(given_label_span.start) else {
                         continue;
                     };
-                    let line_text = src.get_line_text(start_line_obj).unwrap();
+                    let line_text = src.get_line_text(start_location.line).unwrap();
 
-                    let num_chars_before_start = line_text[..start_byte_col.min(line_text.len())]
+                    let num_chars_before_start = line_text
+                        [..start_location.col_idx.min(line_text.len())]
                         .chars()
                         .count();
-                    let start_char_offset = start_line_obj.offset() + num_chars_before_start;
+                    let start_char_offset = start_location.line.offset() + num_chars_before_start;
 
                     if given_label_span.start >= given_label_span.end {
-                        (start_char_offset..start_char_offset, start_line, start_line)
+                        (
+                            start_char_offset..start_char_offset,
+                            start_location.line_idx,
+                            start_location.line_idx,
+                        )
                     } else {
                         // We can subtract 1 from end, because get_byte_line doesn't actually index into the text.
                         let end_pos = given_label_span.end - 1;
-                        let Some((end_line_obj, end_line, end_byte_col)) =
-                            src.get_byte_line(end_pos)
-                        else {
+                        let Some(end_location) = src.get_byte_line(end_pos) else {
                             continue;
                         };
-                        let end_line_text = src.get_line_text(end_line_obj).unwrap();
+                        let end_line_text = src.get_line_text(end_location.line).unwrap();
                         // Have to add 1 back now, so we don't cut a char in two.
                         let num_chars_before_end =
-                            end_line_text[..end_byte_col + 1].chars().count();
-                        let end_char_offset = end_line_obj.offset() + num_chars_before_end;
+                            end_line_text[..end_location.col_idx + 1].chars().count();
+                        let end_char_offset = end_location.line.offset() + num_chars_before_end;
 
-                        (start_char_offset..end_char_offset, start_line, end_line)
+                        (
+                            start_char_offset..end_char_offset,
+                            start_location.line_idx,
+                            end_location.line_idx,
+                        )
                     }
                 }
             };
@@ -197,27 +199,54 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         // --- Header ---
 
         let code = self.code.as_ref().map(|c| format!("[{c}] "));
-        let id = format!("{}{}:", Show(code), self.kind);
         let kind_color = self.kind.get_color(&self.config);
-        writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
+        writeln!(
+            w,
+            "{}: {}",
+            format_args!("{}{}", Show(code), self.kind).fg(kind_color, s),
+            Show(self.msg.as_ref())
+        )?;
 
         let groups = self.get_source_groups(&mut cache);
 
         // Line number maximum width
-        let line_no_width = groups
-            .iter()
-            .map(|g| {
-                (1..)
-                    .map(|x| 10u32.pow(x))
-                    .take_while(|x| g.display_range.end as u32 / x != 0)
-                    .count()
-                    + 1
-            })
-            .max()
-            .unwrap_or(0);
+        let line_num_width = max_line_num(&groups).map_or(0, nb_digits);
+
+        let margin_char = |c: char| c.fg(self.config.margin_color(), s);
+
+        let write_margin = |w: &mut WrappedWriter<W>, idx, is_src_line, is_ellipsis: bool| {
+            let line_num_margin = if is_src_line && !is_ellipsis {
+                format!("{:line_num_width$} {}", idx + 1, draw.vbar)
+                    .fg(self.config.margin_color(), s)
+            } else {
+                format!(
+                    "{}{}",
+                    Rept(' ', line_num_width + 1),
+                    draw.vbar(is_ellipsis)
+                )
+                .fg(self.config.skipped_margin_color(), s)
+            };
+
+            write!(
+                w,
+                " {line_num_margin}{}",
+                Show((!self.config.compact).then_some(' ')),
+            )
+        };
+        let write_spacer_line = |w: &mut WrappedWriter<W>| {
+            if !self.config.compact {
+                writeln!(
+                    w,
+                    "{}{}",
+                    Rept(' ', line_num_width + 2),
+                    margin_char(draw.vbar)
+                )
+            } else {
+                Ok(())
+            }
+        };
 
         // --- Source sections ---
-        let groups_len = groups.len();
         for (
             group_idx,
             SourceGroup {
@@ -226,93 +255,75 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 labels,
                 ..
             },
-        ) in groups.into_iter().enumerate()
+        ) in groups.iter().enumerate()
         {
-            let src_name = cache
-                .display(src_id)
-                .map(|d| d.to_string())
-                .unwrap_or_else(|| "<unknown>".to_string());
-
-            let src = match cache.fetch(src_id) {
-                Ok(src) => src,
-                Err(err) => {
-                    eprintln!("Unable to fetch source {src_name}: {err:?}");
-                    continue;
-                }
+            let Some((src, src_name)) = fetch_source(&mut cache, src_id) else {
+                // `fetch_source` should have reported the error.
+                continue;
             };
 
             // File name & reference
-            let (location, index_type) = if src_id == self.span.source() {
+            let (location, index_type) = if *src_id == self.span.source() {
                 (self.span.start(), self.config.index_type)
             } else {
                 // This has already been converted from bytes to chars, if applicable.
                 (labels[0].char_span.start, IndexType::Char)
             };
-            let line_and_col = match index_type {
-                IndexType::Char => src.get_offset_line(location),
-                IndexType::Byte => src.get_byte_line(location).map(|(line_obj, idx, col)| {
-                    let line_text = src.get_line_text(line_obj).unwrap();
+            let location = Loc(
+                src,
+                src_name,
+                match index_type {
+                    IndexType::Char => src.get_offset_line(location),
+                    IndexType::Byte => src.get_byte_line(location).map(|location| {
+                        let line_text = src.get_line_text(location.line).unwrap();
 
-                    let col = line_text[..col.min(line_text.len())].chars().count();
+                        let col = line_text[..location.col_idx.min(line_text.len())]
+                            .chars()
+                            .count();
 
-                    (line_obj, idx, col)
-                }),
+                        Location {
+                            line: location.line,
+                            line_idx: location.line_idx,
+                            col_idx: col,
+                        }
+                    }),
+                },
+            );
+            let corner_char = if group_idx == 0 {
+                draw.ltop
+            } else {
+                write_spacer_line(&mut w)?;
+                draw.lcross
             };
-            let (line_no, col_no) = line_and_col
-                .map(|(_, idx, col)| {
-                    (
-                        format!("{}", idx + 1 + src.display_line_offset()),
-                        format!("{}", col + 1),
-                    )
-                })
-                .unwrap_or_else(|| ('?'.to_string(), '?'.to_string()));
-            let line_ref = format!("{src_name}:{line_no}:{col_no}");
             writeln!(
                 w,
-                "{}{}{}{} {} {}",
-                Show((' ', line_no_width + 2)).fg(self.config.margin_color(), s),
-                if group_idx == 0 {
-                    draw.ltop
-                } else {
-                    draw.lcross
-                }
-                .fg(self.config.margin_color(), s),
-                draw.hbar.fg(self.config.margin_color(), s),
-                draw.lbox.fg(self.config.margin_color(), s),
-                line_ref,
-                draw.rbox.fg(self.config.margin_color(), s),
+                "{}{}{}{} {location} {}",
+                Rept(' ', line_num_width + 2).fg(self.config.margin_color(), s),
+                margin_char(corner_char),
+                margin_char(draw.hbar),
+                margin_char(draw.lbox),
+                margin_char(draw.rbox),
             )?;
 
             if !self.config.compact {
-                writeln!(
-                    w,
-                    "{}{}",
-                    Show((' ', line_no_width + 2)),
-                    draw.vbar.fg(self.config.margin_color(), s)
-                )?;
-            }
-
-            struct LineLabel<'a> {
-                col: usize,
-                label: &'a LabelInfo<'a>,
-                multi: Option<usize>,
-                draw_msg: bool,
+                write_spacer_line(&mut w)?;
             }
 
             // Generate a list of multi-line labels
-            let mut multi_labels = Vec::new();
-            let mut multi_labels_with_message = Vec::new();
-            for label_info in &labels {
-                if matches!(label_info.kind, LabelKind::Multiline) {
-                    multi_labels.push(label_info);
-                    if label_info.display_info.msg.is_some() {
-                        multi_labels_with_message.push(label_info);
-                    }
-                }
-            }
+            let mut multi_labels: Vec<_> = labels
+                .iter()
+                .filter(|label_info| matches!(label_info.kind, LabelKind::Multiline))
+                .collect();
+            // Sort them by length; this also ensures that the next array is sorted.
+            multi_labels.sort_unstable_by_key(|label_info| !Span::len(&label_info.char_span));
 
-            // Sort multiline labels by length
-            multi_labels.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
+            let mut multi_labels_with_message: Vec<_> = multi_labels
+                .iter()
+                .copied()
+                .filter(|label_info| label_info.display_info.msg.is_some())
+                .collect();
+            // Since we're filtering a sorted array, this one is also sorted.
+            // However, we may want to re-sort it:
             if self.config.minimise_crossings {
                 // There is no total ordering to labels, so just spin around a bunch rearranging labels making tiny improvements
                 // Crap bubble sort, basically
@@ -330,154 +341,119 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         multi_labels_with_message.swap(i, i + 1);
                     }
                 }
-            } else {
-                multi_labels_with_message.sort_by_key(|m| -(Span::len(&m.char_span) as isize));
             }
 
-            let write_margin = |w: &mut WrappedWriter<W>,
-                                idx: usize,
-                                is_line: bool,
-                                is_ellipsis: bool,
-                                draw_labels: bool,
-                                report_row: Option<(usize, bool)>,
-                                line_labels: &[LineLabel],
-                                margin_label: &Option<LineLabel>|
+            let write_margin_and_arrows = |w: &mut WrappedWriter<W>,
+                                           idx: usize,
+                                           is_src_line: bool,
+                                           is_ellipsis: bool,
+                                           report_row: Option<(usize, bool)>,
+                                           line_labels: &[LineLabel],
+                                           margin_label: &Option<LineLabel>|
              -> std::io::Result<()> {
-                let line_no_margin = if is_line && !is_ellipsis {
-                    let line_no = format!("{}", idx + 1);
-                    format!(
-                        "{}{} {}",
-                        Show((' ', line_no_width - line_no.chars().count())),
-                        line_no,
-                        draw.line_margin,
-                    )
-                    .fg(self.config.margin_color(), s)
-                } else {
-                    format!(
-                        "{}{}",
-                        Show((' ', line_no_width + 1)),
-                        if is_ellipsis {
-                            draw.vbar_gap
-                        } else {
-                            draw.vbar
-                        }
-                    )
-                    .fg(self.config.skipped_margin_color(), s)
-                };
-
-                write!(
-                    w,
-                    " {}{}",
-                    line_no_margin,
-                    Show(Some(' ').filter(|_| !self.config.compact)),
-                )?;
+                write_margin(w, idx, is_src_line, is_ellipsis)?;
 
                 // Multi-line margins
-                if draw_labels {
-                    for col in 0..multi_labels_with_message.len()
-                        + (!multi_labels_with_message.is_empty()) as usize
+                for col in 0..multi_labels_with_message.len()
+                    + (!multi_labels_with_message.is_empty()) as usize
+                {
+                    let mut corner = None;
+                    let mut hbar: Option<&LabelInfo> = None;
+                    let mut vbar: Option<&LabelInfo> = None;
+                    let mut margin_ptr = None;
+
+                    let multi_label = multi_labels_with_message.get(col);
+                    let line_span = src.line(idx).unwrap().span();
+
+                    for (i, label) in multi_labels_with_message
+                        [0..(col + 1).min(multi_labels_with_message.len())]
+                        .iter()
+                        .enumerate()
                     {
-                        let mut corner = None;
-                        let mut hbar: Option<&LabelInfo> = None;
-                        let mut vbar: Option<&LabelInfo> = None;
-                        let mut margin_ptr = None;
+                        let margin = margin_label.as_ref().filter(|m| m.is_referencing(label));
 
-                        let multi_label = multi_labels_with_message.get(col);
-                        let line_span = src.line(idx).unwrap().span();
-
-                        for (i, label) in multi_labels_with_message
-                            [0..(col + 1).min(multi_labels_with_message.len())]
-                            .iter()
-                            .enumerate()
+                        if label.char_span.start < line_span.end
+                            && label.char_span.end > line_span.start
                         {
-                            let margin = margin_label
-                                .as_ref()
-                                .filter(|m| std::ptr::eq(*label, m.label));
+                            let is_parent = i != col;
+                            let is_start = line_span.contains(&label.char_span.start);
+                            let is_end = line_span.contains(&label.last_offset());
 
-                            if label.char_span.start < line_span.end
-                                && label.char_span.end > line_span.start
-                            {
-                                let is_parent = i != col;
-                                let is_start = line_span.contains(&label.char_span.start);
-                                let is_end = line_span.contains(&label.last_offset());
-
-                                if let Some(margin) = margin.filter(|_| is_line) {
-                                    margin_ptr = Some((margin, is_start));
-                                } else if !is_start && (!is_end || is_line) {
-                                    vbar = vbar.or(Some(*label).filter(|_| !is_parent));
-                                } else if let Some((report_row, is_arrow)) = report_row {
-                                    let label_row = line_labels
-                                        .iter()
-                                        .enumerate()
-                                        .find(|(_, l)| std::ptr::eq(*label, l.label))
-                                        .map_or(0, |(r, _)| r);
-                                    if report_row == label_row {
-                                        if let Some(margin) = margin {
-                                            vbar = Some(margin.label).filter(|_| col == i);
-                                            if is_start {
-                                                continue;
-                                            }
+                            if let (Some(margin), true) = (margin, is_src_line) {
+                                margin_ptr = Some((margin, is_start));
+                            } else if !is_start && (!is_end || is_src_line) {
+                                vbar = vbar.or((!is_parent).then_some(*label));
+                            } else if let Some((report_row, is_arrow)) = report_row {
+                                let label_row = line_labels
+                                    .iter()
+                                    .enumerate()
+                                    .find(|(_, l)| l.is_referencing(label))
+                                    .map_or(0, |(r, _)| r);
+                                if report_row == label_row {
+                                    if let Some(margin) = margin {
+                                        vbar = (col == i).then_some(margin.label);
+                                        if is_start {
+                                            continue;
                                         }
-
-                                        if is_arrow {
-                                            hbar = Some(*label);
-                                            if !is_parent {
-                                                corner = Some((label, is_start));
-                                            }
-                                        } else if !is_start {
-                                            vbar = vbar.or(Some(*label).filter(|_| !is_parent));
-                                        }
-                                    } else {
-                                        vbar = vbar.or(Some(*label).filter(|_| {
-                                            !is_parent && (is_start ^ (report_row < label_row))
-                                        }));
                                     }
-                                }
 
-                                if let Some(margin) = margin_label.as_ref().filter(|m| {
-                                    is_end && is_line && std::ptr::eq(*label, m.label) && col > i
-                                }) {
-                                    hbar = Some(margin.label);
-                                }
-                            }
-                        }
-
-                        if let (Some((margin, _is_start)), true) = (margin_ptr, is_line) {
-                            let is_col =
-                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
-                            let is_limit = col + 1 == multi_labels_with_message.len();
-                            if !is_col && !is_limit {
-                                hbar = hbar.or(Some(margin.label));
-                            }
-                        }
-
-                        // hbar = hbar.filter(|l| {
-                        //     margin_label
-                        //         .as_ref()
-                        //         .map_or(true, |margin| !std::ptr::eq(margin.label, *l))
-                        //         || !is_line
-                        // });
-
-                        let (a, b) = if let Some((label, is_start)) = corner {
-                            (
-                                if is_start { draw.ltop } else { draw.lbot }
-                                    .fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
-                            )
-                        } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
-                            (
-                                if self.config.cross_gap {
-                                    draw.vbar.fg(v_label.display_info.color, s)
+                                    if is_arrow {
+                                        hbar = Some(*label);
+                                        if !is_parent {
+                                            corner = Some((label, is_start));
+                                        }
+                                    } else if !is_start {
+                                        vbar = vbar.or((!is_parent).then_some(*label));
+                                    }
                                 } else {
-                                    draw.xbar.fg(v_label.display_info.color, s)
-                                },
-                                draw.hbar.fg(h_label.display_info.color, s),
-                            )
-                        } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
-                            let is_col =
-                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
-                            let is_limit = col == multi_labels_with_message.len();
-                            (
+                                    vbar = vbar
+                                        .or((!is_parent && (is_start ^ (report_row < label_row)))
+                                            .then_some(*label));
+                                }
+                            }
+
+                            if let Some(margin) = margin_label.as_ref().filter(|m| {
+                                is_end && is_src_line && std::ptr::eq(*label, m.label) && col > i
+                            }) {
+                                hbar = Some(margin.label);
+                            }
+                        }
+                    }
+
+                    if let (Some((margin, _is_start)), true) = (margin_ptr, is_src_line) {
+                        let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
+                        let is_limit = col + 1 == multi_labels_with_message.len();
+                        if !is_col && !is_limit {
+                            hbar = hbar.or(Some(margin.label));
+                        }
+                    }
+
+                    // hbar = hbar.filter(|l| {
+                    //     margin_label
+                    //         .as_ref()
+                    //         .map_or(false, |margin| !margin.is_referencing(l))
+                    //         || !is_src_line
+                    // });
+
+                    let (a, b) = if let Some((label, is_start)) = corner {
+                        (
+                            Some((draw.arrow_bend(is_start), *label)),
+                            Some((draw.hbar, *label)),
+                        )
+                    } else if let Some((v_label, h_label)) = vbar.zip(hbar) {
+                        (
+                            if self.config.cross_gap {
+                                Some((draw.vbar, v_label))
+                            } else {
+                                Some((draw.xbar, v_label))
+                            },
+                            Some((draw.hbar, h_label)),
+                        )
+                    } else if let (Some((margin, is_start)), true) = (margin_ptr, is_src_line) {
+                        let is_col = multi_label.map_or(false, |ml| margin.is_referencing(ml));
+                        let is_limit = col == multi_labels_with_message.len();
+                        (
+                            Some((
                                 if is_limit {
                                     if self.config.multiline_arrows {
                                         draw.rarrow
@@ -492,33 +468,26 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                                     }
                                 } else {
                                     draw.hbar
-                                }
-                                .fg(margin.label.display_info.color, s),
-                                if !is_limit { draw.hbar } else { ' ' }
-                                    .fg(margin.label.display_info.color, s),
-                            )
-                        } else if let Some(label) = hbar {
-                            (
-                                draw.hbar.fg(label.display_info.color, s),
-                                draw.hbar.fg(label.display_info.color, s),
-                            )
-                        } else if let Some(label) = vbar {
-                            (
-                                if is_ellipsis {
-                                    draw.vbar_gap
-                                } else {
-                                    draw.vbar
-                                }
-                                .fg(label.display_info.color, s),
-                                ' '.fg(None, s),
-                            )
-                        } else {
-                            (' '.fg(None, s), ' '.fg(None, s))
-                        };
-                        write!(w, "{a}")?;
-                        if !self.config.compact {
-                            write!(w, "{b}")?;
-                        }
+                                },
+                                margin.label,
+                            )),
+                            Some((if is_limit { ' ' } else { draw.hbar }, margin.label)),
+                        )
+                    } else if let Some(label) = hbar {
+                        (Some((draw.hbar, label)), Some((draw.hbar, label)))
+                    } else if let Some(label) = vbar {
+                        (Some((draw.vbar(is_ellipsis), label)), None)
+                    } else {
+                        (None, None)
+                    };
+
+                    let arrow_char = |opt: Option<(char, &LabelInfo<'_>)>| match opt {
+                        Some((c, label)) => c.fg(label.display_info.color, s),
+                        None => ' '.fg(None, s),
+                    };
+                    write!(w, "{}", arrow_char(a))?;
+                    if !self.config.compact {
+                        write!(w, "{}", arrow_char(b))?;
                     }
                 }
 
@@ -526,13 +495,13 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             };
 
             let mut is_ellipsis = false;
-            for idx in display_range {
-                let line = if let Some(line) = src.line(idx) {
-                    line
-                } else {
+            for idx in display_range.clone() {
+                let Some(line) = src.line(idx) else {
                     continue;
                 };
 
+                // The (optional) label whose arrows are drawn in the margin (horizontal),
+                // instead of normally (vertical).
                 let margin_label = multi_labels_with_message
                     .iter()
                     .enumerate()
@@ -559,6 +528,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         }
                     })
                     .min_by_key(|ll| (ll.col, !ll.label.char_span.start));
+                let is_margin_label = |label| {
+                    margin_label
+                        .as_ref()
+                        .map_or(false, |m_label| m_label.is_referencing(label))
+                };
 
                 // Generate a list of labels for this line, along with their label columns
                 let mut line_labels = multi_labels_with_message
@@ -567,11 +541,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     .filter_map(|(i, label)| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
-                        if is_start
-                            && margin_label
-                                .as_ref()
-                                .map_or(true, |m| !std::ptr::eq(*label, m.label))
-                        {
+                        if is_start && !is_margin_label(label) {
                             // TODO: Check to see whether multi is the first on the start line or first on the end line
                             Some(LineLabel {
                                 col: label.char_span.start - line.offset(),
@@ -590,28 +560,30 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                             None
                         }
                     })
-                    .collect::<Vec<_>>();
-
-                for label_info in labels.iter().filter(|l| {
-                    l.char_span.start >= line.span().start && l.char_span.end <= line.span().end
-                }) {
-                    if matches!(label_info.kind, LabelKind::Inline) {
-                        line_labels.push(LineLabel {
-                            col: match &self.config.label_attach {
-                                LabelAttach::Start => label_info.char_span.start,
-                                LabelAttach::Middle => {
-                                    (label_info.char_span.start + label_info.char_span.end) / 2
+                    .chain(
+                        labels
+                            .iter()
+                            .filter(|label_info| {
+                                matches!(label_info.kind, LabelKind::Inline)
+                                    && label_info.char_span.start >= line.span().start
+                                    && label_info.char_span.end <= line.span().end
+                            })
+                            .map(|label_info| LineLabel {
+                                col: match &self.config.label_attach {
+                                    LabelAttach::Start => label_info.char_span.start,
+                                    LabelAttach::Middle => {
+                                        (label_info.char_span.start + label_info.char_span.end) / 2
+                                    }
+                                    LabelAttach::End => label_info.last_offset(),
                                 }
-                                LabelAttach::End => label_info.last_offset(),
-                            }
-                            .max(label_info.char_span.start)
-                                - line.offset(),
-                            label: label_info,
-                            multi: None,
-                            draw_msg: true,
-                        });
-                    }
-                }
+                                .max(label_info.char_span.start)
+                                    - line.offset(),
+                                label: label_info,
+                                multi: None,
+                                draw_msg: true,
+                            }),
+                    )
+                    .collect::<Vec<_>>();
 
                 // Skip this line if we don't have labels for it...
                 if line_labels.is_empty()
@@ -629,7 +601,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         is_ellipsis = true;
                     } else {
                         if !self.config.compact && !is_ellipsis {
-                            write_margin(&mut w, idx, false, is_ellipsis, false, None, &[], &None)?;
+                            write_margin(&mut w, idx, false, is_ellipsis)?;
                             writeln!(w)?;
                         }
                         is_ellipsis = true;
@@ -675,10 +647,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         // Only labels with notes get an arrow
                         .enumerate()
                         .filter(|(_, ll)| {
-                            ll.label.display_info.msg.is_some()
-                                && margin_label
-                                    .as_ref()
-                                    .map_or(true, |m| !std::ptr::eq(ll.label, m.label))
+                            ll.label.display_info.msg.is_some() && !is_margin_label(ll.label)
                         })
                         .find(|(j, ll)| ll.col == col && row <= *j)
                         .map(|(_, ll)| ll)
@@ -719,12 +688,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 };
 
                 // Margin
-                write_margin(
+                write_margin_and_arrows(
                     &mut w,
                     idx,
                     true,
                     is_ellipsis,
-                    true,
                     None,
                     &line_labels,
                     &margin_label,
@@ -763,12 +731,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         || (line_label.label.display_info.msg.is_some() && !self.config.compact)
                     {
                         // Margin alternate
-                        write_margin(
+                        write_margin_and_arrows(
                             &mut w,
                             idx,
                             false,
                             is_ellipsis,
-                            true,
                             Some((row, false)),
                             &line_labels,
                             &margin_label,
@@ -823,12 +790,11 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     }
 
                     // Margin
-                    write_margin(
+                    write_margin_and_arrows(
                         &mut w,
                         idx,
                         false,
                         is_ellipsis,
-                        true,
                         Some((row, true)),
                         &line_labels,
                         &margin_label,
@@ -845,9 +811,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                             && line_label.label.display_info.msg.is_some();
                         let [c, tail] = if col == line_label.col
                             && line_label.label.display_info.msg.is_some()
-                            && margin_label
-                                .as_ref()
-                                .map_or(true, |m| !std::ptr::eq(line_label.label, m.label))
+                            && !is_margin_label(line_label.label)
                         {
                             [
                                 if line_label.multi.is_some() {
@@ -895,94 +859,143 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     writeln!(w)?;
                 }
             }
+        }
 
-            let is_final_group = group_idx + 1 == groups_len;
-
-            // Help
-            if is_final_group {
-                for (i, help) in self.help.iter().enumerate() {
-                    if !self.config.compact {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        writeln!(w)?;
-                    }
-                    let help_prefix = format!("{} {}", "Help", i + 1);
-                    let help_prefix_len = if self.help.len() > 1 {
-                        help_prefix.len()
-                    } else {
-                        4
-                    };
-                    let mut lines = help.lines();
-                    if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        if self.help.len() > 1 {
-                            writeln!(
-                                w,
-                                "{}: {}",
-                                help_prefix.fg(self.config.note_color(), s),
-                                line
-                            )?;
-                        } else {
-                            writeln!(w, "{}: {}", "Help".fg(self.config.note_color(), s), line)?;
-                        }
-                    }
-                    for line in lines {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        writeln!(w, "{:>pad$}{}", "", line, pad = help_prefix_len + 2)?;
-                    }
-                }
-            }
-
-            // Note
-            if is_final_group {
-                for (i, note) in self.notes.iter().enumerate() {
-                    if !self.config.compact {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        writeln!(w)?;
-                    }
-                    let note_prefix = format!("{} {}", "Note", i + 1);
-                    let note_prefix_len = if self.notes.len() > 1 {
-                        note_prefix.len()
-                    } else {
-                        4
-                    };
-                    let mut lines = note.lines();
-                    if let Some(line) = lines.next() {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        if self.notes.len() > 1 {
-                            writeln!(
-                                w,
-                                "{}: {}",
-                                note_prefix.fg(self.config.note_color(), s),
-                                line
-                            )?;
-                        } else {
-                            writeln!(w, "{}: {}", "Note".fg(self.config.note_color(), s), line)?;
-                        }
-                    }
-                    for line in lines {
-                        write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        writeln!(w, "{:>pad$}{}", "", line, pad = note_prefix_len + 2)?;
-                    }
-                }
-            }
-
-            // Tail of report
+        // Help
+        for (i, help) in self.help.iter().enumerate() {
             if !self.config.compact {
-                if is_final_group {
-                    let final_margin =
-                        format!("{}{}", Show((draw.hbar, line_no_width + 2)), draw.rbot);
-                    writeln!(w, "{}", final_margin.fg(self.config.margin_color(), s))?;
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w)?;
+            }
+            let help_prefix = format!("{} {}", "Help", i + 1);
+            let help_prefix_len = if self.help.len() > 1 {
+                help_prefix.len()
+            } else {
+                4
+            };
+            let mut lines = help.lines();
+            if let Some(line) = lines.next() {
+                write_margin(&mut w, 0, false, false)?;
+                if self.help.len() > 1 {
+                    writeln!(w, "{}: {line}", help_prefix.fg(self.config.note_color(), s))?;
                 } else {
-                    writeln!(
-                        w,
-                        "{}{}",
-                        Show((' ', line_no_width + 2)),
-                        draw.vbar.fg(self.config.margin_color(), s)
-                    )?;
+                    writeln!(w, "{}: {line}", "Help".fg(self.config.note_color(), s))?;
                 }
+            }
+            for line in lines {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w, "{:>pad$}{line}", "", pad = help_prefix_len + 2)?;
             }
         }
+
+        // Notes
+        for (i, note) in self.notes.iter().enumerate() {
+            if !self.config.compact {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w)?;
+            }
+            let note_prefix = format!("{} {}", "Note", i + 1);
+            let note_prefix_len = if self.notes.len() > 1 {
+                note_prefix.len()
+            } else {
+                4
+            };
+            let mut lines = note.lines();
+            if let Some(line) = lines.next() {
+                write_margin(&mut w, 0, false, false)?;
+                if self.notes.len() > 1 {
+                    writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
+                } else {
+                    writeln!(w, "{}: {line}", "Note".fg(self.config.note_color(), s))?;
+                }
+            }
+            for line in lines {
+                write_margin(&mut w, 0, false, false)?;
+                writeln!(w, "{:>pad$}{line}", "", pad = note_prefix_len + 2)?;
+            }
+        }
+
+        // Tail of report.
+        // Not to be emitted in compact mode, or if nothing has had the margin printed.
+        if !(self.config.compact
+            || groups.is_empty() && self.help.is_empty() && self.notes.is_empty())
+        {
+            writeln!(
+                w,
+                "{}",
+                format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
+                    .fg(self.config.margin_color(), s)
+            )?;
+        }
+
         Ok(())
+    }
+}
+
+struct LineLabel<'a> {
+    col: usize,
+    label: &'a LabelInfo<'a>,
+    multi: Option<usize>,
+    draw_msg: bool,
+}
+
+impl LineLabel<'_> {
+    fn is_referencing(&self, label: &LabelInfo<'_>) -> bool {
+        // Do they point to the same label?
+        // Note that we want this, and not to compare the labels themselves, so as to support
+        // printing the same label twice if we were given that.
+        std::ptr::eq(self.label, label)
+    }
+}
+
+fn fetch_source<'a, Id: ?Sized, C: Cache<Id>>(
+    cache: &'a mut C,
+    src_id: &Id,
+) -> Option<(&'a Source<C::Storage>, String)> {
+    let src_name = display_name(cache, src_id);
+    match cache.fetch(src_id) {
+        Ok(src) => Some((src, src_name)),
+        Err(err) => {
+            eprintln!("Unable to fetch source {src_name}: {err:?}");
+            None
+        }
+    }
+}
+
+fn display_name<Id: ?Sized, C: Cache<Id>>(cache: &C, src_id: &Id) -> String {
+    cache
+        .display(src_id)
+        .map(|d| d.to_string())
+        .unwrap_or_else(|| "<unknown>".to_string())
+}
+
+fn max_line_num<S: Span>(groups: &[SourceGroup<'_, S>]) -> Option<usize> {
+    groups
+        .iter()
+        .map(|group| nb_digits(group.display_range.end))
+        .max()
+}
+
+/// Returns how many digits it takes to print `value`.
+fn nb_digits(value: usize) -> usize {
+    value.checked_ilog10().unwrap_or(0) as usize + 1
+}
+
+#[derive(Debug, Clone)]
+struct Loc<'src, I: AsRef<str>>(&'src Source<I>, String, Option<Location>);
+
+impl<I: AsRef<str>> Display for Loc<'_, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.2.as_ref() {
+            Some(location) => write!(
+                f,
+                "{}:{}:{}",
+                self.1,
+                location.line_idx + 1 + self.0.display_line_offset(),
+                location.col_idx + 1,
+            ),
+            None => write!(f, ":?:?"),
+        }
     }
 }
 
@@ -1000,7 +1013,7 @@ mod tests {
     use insta::assert_snapshot;
 
     use crate::{
-        Cache, CharSet, Config, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
+        Cache, Config, FnCache, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
     };
 
     impl<S: Span, K: ReportStyle> Report<S, K> {
@@ -1011,23 +1024,25 @@ mod tests {
         }
     }
 
-    fn no_color_and_ascii() -> Config {
-        Config::default()
-            .with_color(false)
-            // Using Ascii so that the inline snapshots display correctly
-            // even with fonts where characters like '┬' take up more space.
-            .with_char_set(CharSet::Ascii)
+    fn no_color() -> Config {
+        Config::default().with_color(false)
     }
 
     fn remove_trailing(s: String) -> String {
         s.lines().flat_map(|l| [l.trim_end(), "\n"]).collect()
     }
 
+    fn multi_sources<'srcs, const NB_SOURCES: usize>(
+        sources: &'srcs [&'static str; NB_SOURCES],
+    ) -> impl Cache<usize> + 'srcs {
+        FnCache::new(move |id: &_| Ok::<_, std::convert::Infallible>(sources[*id]))
+    }
+
     #[test]
     fn one_message() {
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .finish()
                 .write_to_string(Source::from("")),
@@ -1040,21 +1055,21 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5))
                 .with_label(Label::new(9..15))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | -----    ------
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ─────    ──────
+        ───╯
+        ");
     }
 
     #[test]
@@ -1062,23 +1077,23 @@ mod tests {
         let source = "apple\n== orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5))
                 .with_label(Label::new(9..15))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple
-           | -----
-         2 | == orange;
-           |    ------
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple
+           │ ─────
+         2 │ == orange;
+           │    ──────
+        ───╯
+        ");
     }
 
     #[test]
@@ -1086,7 +1101,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
                 .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -1094,17 +1109,17 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | -----    ------
-           |   `---------|---- This is an apple
-           |             |
-           |             `---- This is an orange
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an apple
+           │             │
+           │             ╰──── This is an orange
+        ───╯
+        ");
     }
 
     #[test]
@@ -1112,25 +1127,49 @@ mod tests {
         let source = "apple ==\norange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
                 .with_label(Label::new(9..15).with_message("This is an orange"))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple ==
-           | -----
-           |   `---- This is an apple
-         2 | orange;
-           | ------
-           |    `---- This is an orange
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple ==
+           │ ──┬──
+           │   ╰──── This is an apple
+         2 │ orange;
+           │ ───┬──
+           │    ╰──── This is an orange
+        ───╯
+        ");
+    }
+    #[test]
+    fn duplicate_label() {
+        let source = "apple == orange;";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @"
+        Error: can't compare apples with oranges
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──
+           │   ╰──── This is an apple
+           │   │
+           │   ╰──── This is an apple
+        ───╯
+        ");
     }
 
     #[test]
@@ -1138,7 +1177,7 @@ mod tests {
         let source = "äpplë == örängë;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_index_type(IndexType::Char))
+                .with_config(no_color().with_index_type(IndexType::Char))
                 .with_message("can't compare äpplës with örängës")
                 .with_label(Label::new(0..5).with_message("This is an äpplë"))
                 .with_label(Label::new(9..15).with_message("This is an örängë"))
@@ -1146,17 +1185,17 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare äpplës with örängës
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | äpplë == örängë;
-           | -----    ------
-           |   `---------|---- This is an äpplë
-           |             |
-           |             `---- This is an örängë
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an äpplë
+           │             │
+           │             ╰──── This is an örängë
+        ───╯
+        ");
     }
 
     #[test]
@@ -1164,7 +1203,7 @@ mod tests {
         let source = "äpplë == örängë;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                .with_config(no_color().with_index_type(IndexType::Byte))
                 .with_message("can't compare äpplës with örängës")
                 .with_label(Label::new(0..7).with_message("This is an äpplë"))
                 .with_label(Label::new(11..20).with_message("This is an örängë"))
@@ -1172,17 +1211,17 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare äpplës with örängës
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | äpplë == örängë;
-           | -----    ------
-           |   `---------|---- This is an äpplë
-           |             |
-           |             `---- This is an örängë
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an äpplë
+           │             │
+           │             ╰──── This is an örängë
+        ───╯
+        ");
     }
 
     #[test]
@@ -1190,7 +1229,7 @@ mod tests {
         let source = "äpplë == örängë;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 11..11)
-                .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                .with_config(no_color().with_index_type(IndexType::Byte))
                 .with_message("can't compare äpplës with örängës")
                 .with_label(Label::new(0..7).with_message("This is an äpplë"))
                 .with_label(Label::new(11..20).with_message("This is an örängë"))
@@ -1198,17 +1237,41 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if these lines didn't cross
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare äpplës with örängës
-           ,-[ <unknown>:1:10 ]
-           |
-         1 | äpplë == örängë;
-           | -----    ------
-           |   `---------|---- This is an äpplë
-           |             |
-           |             `---- This is an örängë
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:10 │
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an äpplë
+           │             │
+           │             ╰──── This is an örängë
+        ───╯
+        ");
+    }
+
+    #[test]
+    fn crossing_lines() {
+        let source = "äpplë == örängë;";
+        let msg = Report::build(ReportKind::Error, 11..11)
+            .with_config(no_color().with_cross_gap(false))
+            .with_message("can't compare äpplës with örängës")
+            .with_label(Label::new(0..5).with_message("This is an äpplë"))
+            .with_label(Label::new(9..15).with_message("This is an örängë"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if these lines didn't cross
+        assert_snapshot!(msg, @"
+        Error: can't compare äpplës with örängës
+           ╭─┤ <unknown>:1:12 │
+           │
+         1 │ äpplë == örängë;
+           │ ──┬──    ───┬──  
+           │   ╰─────────┼──── This is an äpplë
+           │             │    
+           │             ╰──── This is an örängë
+        ───╯
+        ");
     }
 
     #[test]
@@ -1216,7 +1279,7 @@ mod tests {
         let source = format!("{}orange", "apple == ".repeat(100));
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(
                     Label::new(source.len() - 6..source.len()).with_message("This is an orange"),
@@ -1225,15 +1288,15 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if the start of long lines would be omitted (like rustc does)
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
-           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ------
-           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        `---- This is an orange
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == apple == orange
+           │                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ───┬──
+           │                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ╰──── This is an orange
+        ───╯
+        ");
     }
 
     #[test]
@@ -1241,22 +1304,22 @@ mod tests {
         let source = "apple ==\n";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                .with_config(no_color().with_index_type(IndexType::Byte))
                 .with_message("unexpected end of file")
                 .with_label(Label::new(9..9).with_message("Unexpected end of file"))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: unexpected end of file
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple ==
-           |          |
-           |          `- Unexpected end of file
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple ==
+           │          │
+           │          ╰─ Unexpected end of file
+        ───╯
+        ");
     }
 
     #[test]
@@ -1264,22 +1327,22 @@ mod tests {
         let source = "";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: unexpected end of file
-           ,-[ <unknown>:1:1 ]
-           |
-         1 |
-           | |
-           | `- No more fruit!
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │
+           │ │
+           │ ╰─ No more fruit!
+        ───╯
+        ");
     }
 
     #[test]
@@ -1287,7 +1350,7 @@ mod tests {
         let source = "";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
                 .with_help("have you tried going to the farmer's market?")
@@ -1295,17 +1358,17 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: unexpected end of file
-           ,-[ <unknown>:1:1 ]
-           |
-         1 |
-           | |
-           | `- No more fruit!
-           |
-           | Help: have you tried going to the farmer's market?
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │
+           │ │
+           │ ╰─ No more fruit!
+           │
+           │ Help: have you tried going to the farmer's market?
+        ───╯
+        ");
     }
 
     #[test]
@@ -1313,7 +1376,7 @@ mod tests {
         let source = "";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
                 .with_note("eat your greens!")
@@ -1321,17 +1384,17 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: unexpected end of file
-           ,-[ <unknown>:1:1 ]
-           |
-         1 |
-           | |
-           | `- No more fruit!
-           |
-           | Note: eat your greens!
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │
+           │ │
+           │ ╰─ No more fruit!
+           │
+           │ Note: eat your greens!
+        ───╯
+        ");
     }
 
     #[test]
@@ -1339,7 +1402,7 @@ mod tests {
         let source = "";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("unexpected end of file")
                 .with_label(Label::new(0..0).with_message("No more fruit!"))
                 .with_note("eat your greens!")
@@ -1348,19 +1411,19 @@ mod tests {
                 .write_to_string(Source::from(source)),
         );
 
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: unexpected end of file
-           ,-[ <unknown>:1:1 ]
-           |
-         1 |
-           | |
-           | `- No more fruit!
-           |
-           | Help: have you tried going to the farmer's market?
-           |
-           | Note: eat your greens!
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │
+           │ │
+           │ ╰─ No more fruit!
+           │
+           │ Help: have you tried going to the farmer's market?
+           │
+           │ Note: eat your greens!
+        ───╯
+        ");
     }
 
     #[test]
@@ -1371,7 +1434,7 @@ mod tests {
             for j in i..=source.len() {
                 let _ = remove_trailing(
                     Report::build(ReportKind::Error, 0..0)
-                        .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                        .with_config(no_color().with_index_type(IndexType::Byte))
                         .with_message("Label")
                         .with_label(Label::new(i..j).with_message("Label"))
                         .finish()
@@ -1386,23 +1449,56 @@ mod tests {
         let source = "apple\n==\norange";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if the 2nd line wasn't omitted
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error:
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | ,-> apple
-           : :
-         3 | |-> orange
-           | |
-           | `----------- illegal comparison
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ ╭─▶ apple
+           ┆ ┆
+         3 │ ├─▶ orange
+           │ │
+           │ ╰─────────── illegal comparison
+        ───╯
+        ");
+    }
+
+    #[test]
+    fn multiple_multilines_same_span() {
+        let source = "apple\n==\norange";
+        let msg = Report::build(ReportKind::Error, 0..0)
+            .with_config(no_color())
+            .with_label(Label::new(0..source.len()).with_message("illegal comparison"))
+            .with_label(Label::new(0..source.len()).with_message("do not do this"))
+            .with_label(Label::new(0..source.len()).with_message("please reconsider"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if the 2nd line wasn't omitted
+        // TODO: it would be nice if the lines didn't cross, or at least less so
+        assert_snapshot!(msg, @"
+        Error: 
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ ╭─────▶ apple
+           │ │       🭯       
+           │ │ ╭─────╯       
+           │ │ │     │       
+           │ │ │ ╭───╯       
+           ┆ ┆ ┆ ┆   
+         3 │ ├─│─│─▶ orange
+           │ │ │ │        🭯  
+           │ ╰─│─│────────│── illegal comparison
+           │   │ │        │  
+           │   ╰─│────────┴── do not do this
+           │     │        │  
+           │     ╰────────┴── please reconsider
+        ───╯
+        ");
     }
 
     #[test]
@@ -1410,25 +1506,25 @@ mod tests {
         let source = "apple\nbanana\ncarrot\ndragonfruit\negg\nfruit\ngrapes";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_context_lines(1))
+                .with_config(no_color().with_context_lines(1))
                 .with_label(Label::new(13..35).with_message("illegal comparison"))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if the 2nd line wasn't omitted
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error:
-           ,-[ <unknown>:1:1 ]
-           |
-         2 |     banana
-         3 | ,-> carrot
-         4 | |   dragonfruit
-         5 | |-> egg
-           | |
-           | `--------- illegal comparison
-         6 |     fruit
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         2 │     banana
+         3 │ ╭─▶ carrot
+         4 │ │   dragonfruit
+         5 │ ├─▶ egg
+           │ │
+           │ ╰───────── illegal comparison
+         6 │     fruit
+        ───╯
+        ");
     }
 
     #[test]
@@ -1436,24 +1532,24 @@ mod tests {
         let source = "https://example.com/";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_label(Label::new(0..source.len()).with_message("URL"))
                 .with_label(Label::new(0..source.find(':').unwrap()).with_message("scheme"))
                 .finish()
                 .write_to_string(Source::from(source)),
         );
         // TODO: it would be nice if you could tell where the spans start and end.
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error:
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | https://example.com/
-           | --------------------
-           |   `-------|----------- scheme
-           |           |
-           |           `----------- URL
-        ---'
-        "###);
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ https://example.com/
+           │ ──┬───────┬─────────
+           │   ╰───────│─────────── scheme
+           │           │
+           │           ╰─────────── URL
+        ───╯
+        ");
     }
 
     #[test]
@@ -1461,7 +1557,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
                 .with_label(
@@ -1476,25 +1572,25 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | -----    ------
-           |   `---------|---- This is an apple
-           |   |         |
-           |   `---------|---- Have I mentioned that this is an apple?
-           |   |         |
-           |   `---------|---- No really, have I mentioned that?
-           |             |
-           |             `---- This is an orange
-           |             |
-           |             `---- Have I mentioned that this is an orange?
-           |             |
-           |             `---- No really, have I mentioned that?
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an apple
+           │   │         │
+           │   ╰─────────│──── Have I mentioned that this is an apple?
+           │   │         │
+           │   ╰─────────│──── No really, have I mentioned that?
+           │             │
+           │             ╰──── This is an orange
+           │             │
+           │             ╰──── Have I mentioned that this is an orange?
+           │             │
+           │             ╰──── No really, have I mentioned that?
+        ───╯
+        ")
     }
 
     #[test]
@@ -1502,7 +1598,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
                 .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -1510,19 +1606,19 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | -----    ------
-           |   `---------|---- This is an apple
-           |             |
-           |             `---- This is an orange
-           |
-           | Note: stop trying ... this is a fruitless endeavor
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an apple
+           │             │
+           │             ╰──── This is an orange
+           │
+           │ Note: stop trying ... this is a fruitless endeavor
+        ───╯
+        ")
     }
 
     #[test]
@@ -1530,7 +1626,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
                 .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -1538,19 +1634,19 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | -----    ------
-           |   `---------|---- This is an apple
-           |             |
-           |             `---- This is an orange
-           |
-           | Help: have you tried peeling the orange?
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an apple
+           │             │
+           │             ╰──── This is an orange
+           │
+           │ Help: have you tried peeling the orange?
+        ───╯
+        ")
     }
 
     #[test]
@@ -1558,7 +1654,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
                 .with_label(Label::new(9..15).with_message("This is an orange"))
@@ -1567,21 +1663,21 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | -----    ------
-           |   `---------|---- This is an apple
-           |             |
-           |             `---- This is an orange
-           |
-           | Help: have you tried peeling the orange?
-           |
-           | Note: stop trying ... this is a fruitless endeavor
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an apple
+           │             │
+           │             ╰──── This is an orange
+           │
+           │ Help: have you tried peeling the orange?
+           │
+           │ Note: stop trying ... this is a fruitless endeavor
+        ───╯
+        ")
     }
 
     #[test]
@@ -1589,24 +1685,24 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..15).with_message("This is a strange comparison"))
                 .with_note("No need to try, they can't be compared.")
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | ---------------
-           |        `--------- This is a strange comparison
-           |
-           | Note: No need to try, they can't be compared.
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ───────┬───────
+           │        ╰───────── This is a strange comparison
+           │
+           │ Note: No need to try, they can't be compared.
+        ───╯
+        ")
     }
 
     #[test]
@@ -1614,7 +1710,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..15).with_message("This is a strange comparison"))
                 .with_note("No need to try, they can't be compared.")
@@ -1622,19 +1718,19 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | ---------------
-           |        `--------- This is a strange comparison
-           |
-           | Note 1: No need to try, they can't be compared.
-           |
-           | Note 2: Yeah, really, please stop.
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ───────┬───────
+           │        ╰───────── This is a strange comparison
+           │
+           │ Note 1: No need to try, they can't be compared.
+           │
+           │ Note 2: Yeah, really, please stop.
+        ───╯
+        ")
     }
 
     #[test]
@@ -1642,7 +1738,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..15).with_message("This is a strange comparison"))
                 .with_note("No need to try, they can't be compared.")
@@ -1650,20 +1746,20 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | ---------------
-           |        `--------- This is a strange comparison
-           |
-           | Note 1: No need to try, they can't be compared.
-           |
-           | Note 2: Yeah, really, please stop.
-           |         It has no resemblance.
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ───────┬───────
+           │        ╰───────── This is a strange comparison
+           │
+           │ Note 1: No need to try, they can't be compared.
+           │
+           │ Note 2: Yeah, really, please stop.
+           │         It has no resemblance.
+        ───╯
+        ")
     }
 
     #[test]
@@ -1671,7 +1767,7 @@ mod tests {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..15).with_message("This is a strange comparison"))
                 .with_help("No need to try, they can't be compared.")
@@ -1679,27 +1775,27 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | apple == orange;
-           | ---------------
-           |        `--------- This is a strange comparison
-           |
-           | Help 1: No need to try, they can't be compared.
-           |
-           | Help 2: Yeah, really, please stop.
-           |         It has no resemblance.
-        ---'
-        "###)
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ apple == orange;
+           │ ───────┬───────
+           │        ╰───────── This is a strange comparison
+           │
+           │ Help 1: No need to try, they can't be compared.
+           │
+           │ Help 2: Yeah, really, please stop.
+           │         It has no resemblance.
+        ───╯
+        ")
     }
 
     #[test]
     fn ordered_labels() {
         let msg = remove_trailing(
             Report::build(ReportKind::Error, ("", 0..0))
-                .with_config(no_color_and_ascii())
+                .with_config(no_color())
                 .with_label(Label::new(("b", 13..18)).with_order(1).with_message("1"))
                 .with_label(Label::new(("a", 0..6)).with_order(2).with_message("2"))
                 .with_label(Label::new(("a", 7..12)).with_order(3).with_message("3"))
@@ -1711,33 +1807,33 @@ mod tests {
                     ("b", "fourth\nfifth\nfirst"),
                 ])),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error:
-           ,-[ b:3:1 ]
-           |
-         3 | first
-           | -----
-           |   `---- 1
-           |
-           |-[ a:1:1 ]
-           |
-         1 | second
-           | ------
-           |    `---- 2
-         2 | third
-           | -----
-           |   `---- 3
-           |
-           |-[ b:1:1 ]
-           |
-         1 | fourth
-           | ------
-           |    `---- 4
-         2 | fifth
-           | -----
-           |   `---- 5
-        ---'
-        "###)
+           ╭─┤ b:3:1 │
+           │
+         3 │ first
+           │ ──┬──
+           │   ╰──── 1
+           │
+           ├─┤ a:1:1 │
+           │
+         1 │ second
+           │ ───┬──
+           │    ╰──── 2
+         2 │ third
+           │ ──┬──
+           │   ╰──── 3
+           │
+           ├─┤ b:1:1 │
+           │
+         1 │ fourth
+           │ ───┬──
+           │    ╰──── 4
+         2 │ fifth
+           │ ──┬──
+           │   ╰──── 5
+        ───╯
+        ")
     }
 
     #[test]
@@ -1745,7 +1841,7 @@ mod tests {
         let source = "begin\napple == orange;\nend";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_minimise_crossings(true))
+                .with_config(no_color().with_minimise_crossings(true))
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(6..11).with_message("This is an apple"))
                 .with_label(Label::new(15..21).with_message("This is an orange"))
@@ -1754,22 +1850,118 @@ mod tests {
                 .finish()
                 .write_to_string(Source::from(source)),
         );
-        assert_snapshot!(msg, @r###"
+        assert_snapshot!(msg, @"
         Error: can't compare apples with oranges
-           ,-[ <unknown>:1:1 ]
-           |
-         1 | ,-> begin
-         2 | |   apple == orange;
-           | |   -----    ------
-           | |     |         `---- This is an orange
-           | |     |
-           | |     `-------------- This is an apple
-         3 | |-> end
-           | |     ^
-           | |     `-- single
-           | |
-           | `-------- multi 1
-        ---'
+           ╭─┤ <unknown>:1:1 │
+           │
+         1 │ ╭─▶ begin
+         2 │ │   apple == orange;
+           │ │   ──┬──    ───┬──
+           │ │     │         ╰──── This is an orange
+           │ │     │
+           │ │     ╰────────────── This is an apple
+         3 │ ├─▶ end
+           │ │     🭯
+           │ │     ╰── single
+           │ │
+           │ ╰──────── multi 1
+        ───╯
+        ")
+    }
+
+    #[test]
+    fn only_help_and_note() {
+        let source = "this should not be printed";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color())
+                .with_message("Programming language \"Rest\" not found")
+                .with_help("a language with a similar name exists: Rust")
+                .with_note("perhaps you'd like some sleep?")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r###"
+        Error: Programming language "Rest" not found
+          │
+          │ Help: a language with a similar name exists: Rust
+          │
+          │ Note: perhaps you'd like some sleep?
+        ──╯
         "###)
+    }
+
+    #[test]
+    fn multi_source() {
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, (0, 0..0))
+                .with_config(no_color())
+                .with_message("can't compare apples with oranges or pears")
+                .with_label(Label::new((0, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((0, 9..15)).with_message("This is an orange"))
+                .with_label(Label::new((1, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((1, 9..13)).with_message("This is a pear"))
+                .finish()
+                .write_to_string(multi_sources(&["apple == orange;", "apple == pear;"])),
+        );
+        assert_snapshot!(msg, @"
+        Error: can't compare apples with oranges or pears
+           ╭─┤ 0:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an apple
+           │             │
+           │             ╰──── This is an orange
+           │
+           ├─┤ 1:1:1 │
+           │
+         1 │ apple == pear;
+           │ ──┬──    ──┬─
+           │   ╰────────│─── This is an apple
+           │            │
+           │            ╰─── This is a pear
+        ───╯
+        ")
+    }
+
+    #[test]
+    fn help_and_note_multi() {
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, (0, 0..0))
+                .with_config(no_color())
+                .with_message("can't compare apples with oranges or pears")
+                .with_label(Label::new((0, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((0, 9..15)).with_message("This is an orange"))
+                .with_label(Label::new((1, 0..5)).with_message("This is an apple"))
+                .with_label(Label::new((1, 9..13)).with_message("This is a pear"))
+                .with_help("have you tried peeling the orange?")
+                .with_note("stop trying ... this is a fruitless endeavor")
+                .finish()
+                .write_to_string(multi_sources(&["apple == orange;", "apple == pear;"])),
+        );
+        assert_snapshot!(msg, @"
+        Error: can't compare apples with oranges or pears
+           ╭─┤ 0:1:1 │
+           │
+         1 │ apple == orange;
+           │ ──┬──    ───┬──
+           │   ╰─────────│──── This is an apple
+           │             │
+           │             ╰──── This is an orange
+           │
+           ├─┤ 1:1:1 │
+           │
+         1 │ apple == pear;
+           │ ──┬──    ──┬─
+           │   ╰────────│─── This is an apple
+           │            │
+           │            ╰─── This is a pear
+           │
+           │ Help: have you tried peeling the orange?
+           │
+           │ Note: stop trying ... this is a fruitless endeavor
+        ───╯
+        ")
     }
 }
