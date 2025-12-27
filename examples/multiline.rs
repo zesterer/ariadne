@@ -23,6 +23,22 @@ fn main() {
                 .with_color(b),
         )
         .with_label(
+            Label::new(("sample.tao", 33..33))
+                .with_message(format!(
+                    "Consider converting the {} to a {}",
+                    "Nat".fg(a),
+                    "Str".fg(b)
+                ))
+                .with_color(Color::Rgb(0, 200, 0))
+                .with_suggested_replacement(".to_string()"),
+        )
+        .with_label(
+            Label::new(("sample.tao", 52..55))
+                .with_message(format!("Consider deleting the {}", "Str".fg(b)))
+                .with_color(Color::Rgb(200, 0, 0))
+                .with_suggested_replacement(""),
+        )
+        .with_label(
             Label::new(("sample.tao", 11..58))
                 .with_message(format!(
                     "The values are outputs of this {} expression",
@@ -30,16 +46,16 @@ fn main() {
                 ))
                 .with_color(out),
         )
-        .with_label(
-            Label::new(("sample.tao", 0..58))
-                .with_message(format!("The {} has a problem", "definition".fg(out2),))
-                .with_color(out2),
-        )
-        .with_label(
-            Label::new(("sample.tao", 60..86))
-                .with_message(format!("Usage of {} here", "definition".fg(out2),))
-                .with_color(out2),
-        )
+        // .with_label(
+        //     Label::new(("sample.tao", 0..58))
+        //         .with_message(format!("The {} has a problem", "definition".fg(out2),))
+        //         .with_color(out2),
+        // )
+        // .with_label(
+        //     Label::new(("sample.tao", 60..86))
+        //         .with_message(format!("Usage of {} here", "definition".fg(out2),))
+        //         .with_color(out2),
+        // )
         .with_note(format!(
             "Outputs of {} expressions must coerce to the same type",
             "match".fg(out)
