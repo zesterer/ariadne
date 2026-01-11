@@ -901,12 +901,12 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             // Help
             if is_final_group {
                 for (i, help) in self.help.iter().enumerate() {
-                    if !self.config.compact {
+                    if !self.config.compact && (self.config.space_helps || (i == 0)) {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
                         writeln!(w)?;
                     }
                     let help_prefix = format!("{} {}", "Help", i + 1);
-                    let help_prefix_len = if self.help.len() > 1 {
+                    let help_prefix_len = if (self.help.len() > 1) && self.config.enumerate_helps {
                         help_prefix.len()
                     } else {
                         4
@@ -914,7 +914,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     let mut lines = help.lines();
                     if let Some(line) = lines.next() {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        if self.help.len() > 1 {
+                        if (self.help.len() > 1) && self.config.enumerate_helps {
                             writeln!(
                                 w,
                                 "{}: {}",
@@ -935,12 +935,12 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
             // Note
             if is_final_group {
                 for (i, note) in self.notes.iter().enumerate() {
-                    if !self.config.compact {
+                    if !self.config.compact && (self.config.space_notes || (i == 0)) {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
                         writeln!(w)?;
                     }
                     let note_prefix = format!("{} {}", "Note", i + 1);
-                    let note_prefix_len = if self.notes.len() > 1 {
+                    let note_prefix_len = if (self.notes.len() > 1) && self.config.enumerate_notes {
                         note_prefix.len()
                     } else {
                         4
@@ -948,7 +948,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                     let mut lines = note.lines();
                     if let Some(line) = lines.next() {
                         write_margin(&mut w, 0, false, false, true, Some((0, false)), &[], &None)?;
-                        if self.notes.len() > 1 {
+                        if (self.notes.len() > 1) && self.config.enumerate_notes {
                             writeln!(
                                 w,
                                 "{}: {}",
