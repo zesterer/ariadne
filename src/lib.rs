@@ -531,9 +531,7 @@ pub struct Config {
     context_lines: usize,
     ansi_mode: AnsiMode,
     enumerate_notes: bool,
-    space_notes: bool,
     enumerate_helps: bool,
-    space_helps: bool,
 }
 
 impl Config {
@@ -634,29 +632,11 @@ impl Config {
         self
     }
 
-    /// Should separate notes be spaced?
-    ///
-    /// If unspecified, this defaults to [`true`].
-    /// This feature behaves as [`true`] when the configuration is compact
-    pub const fn with_spaced_notes(mut self, space_notes: bool) -> Self {
-        self.space_notes = space_notes;
-        self
-    }
-
     /// Should separate helps be numbered?
     ///
     /// If unspecified, this defaults to [`true`]
     pub const fn with_enumerated_helps(mut self, enumerate_helps: bool) -> Self {
         self.enumerate_helps = enumerate_helps;
-        self
-    }
-
-    /// Should separate helps be spaced?
-    ///
-    /// If unspecified, this defaults to [`true`].
-    /// This feature behaves as [`true`] when the configuration is compact
-    pub const fn with_spaced_helps(mut self, space_helps: bool) -> Self {
-        self.space_helps = space_helps;
         self
     }
 
@@ -714,9 +694,7 @@ impl Config {
             context_lines: 0,
             ansi_mode: AnsiMode::On,
             enumerate_notes: true,
-            space_notes: true,
             enumerate_helps: true,
-            space_helps: true,
         }
     }
 }
