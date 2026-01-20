@@ -1631,7 +1631,6 @@ mod tests {
            |        `--------- This is a strange comparison
            |
            | Note 1: No need to try, they can't be compared.
-           |
            | Note 2: Yeah, really, please stop.
         ---'
         "###)
@@ -1659,9 +1658,38 @@ mod tests {
            |        `--------- This is a strange comparison
            |
            | Note 1: No need to try, they can't be compared.
+           | Note 2: Yeah, really, please stop.
+           |         It has no resemblance.
+        ---'
+        "###)
+    }
+
+    #[test]
+    fn multi_notes_trailing_multi_lines() {
+        let source = "apple == orange;";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii())
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..15).with_message("This is a strange comparison"))
+                .with_note("No need to try, they can't be compared.\n")
+                .with_note("Yeah, really, please stop.\nIt has no resemblance.\n")
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r###"
+        Error: can't compare apples with oranges
+           ,-[ <unknown>:1:1 ]
+           |
+         1 | apple == orange;
+           | ---------------
+           |        `--------- This is a strange comparison
+           |
+           | Note 1: No need to try, they can't be compared.
            |
            | Note 2: Yeah, really, please stop.
            |         It has no resemblance.
+           |
         ---'
         "###)
     }
@@ -1688,7 +1716,6 @@ mod tests {
            |        `--------- This is a strange comparison
            |
            | Help 1: No need to try, they can't be compared.
-           |
            | Help 2: Yeah, really, please stop.
            |         It has no resemblance.
         ---'
