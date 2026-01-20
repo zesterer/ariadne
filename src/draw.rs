@@ -40,7 +40,7 @@ impl Characters {
             xbar: '┼',
             vbar_gap: '┆',
             line_margin: '┤',
-            uarrow: '🭯',
+            uarrow: '▲',
             rarrow: '▶',
             ltop: '╭',
             mtop: '┬',
@@ -56,7 +56,7 @@ impl Characters {
             runderbar: '┐',
             munderbar: '┬',
             underline: '─',
-            underbar_single: '🭯',
+            underbar_single: '▲',
         }
     }
 
