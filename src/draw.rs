@@ -41,6 +41,8 @@ impl Characters {
             vbar_gap: '┆',
             line_margin: '┤',
             uarrow: '▲',
+            // TODO: Revert when more commonly supported
+            // uarrow: '🭯',
             rarrow: '▶',
             ltop: '╭',
             mtop: '┬',
@@ -57,6 +59,8 @@ impl Characters {
             munderbar: '┬',
             underline: '─',
             underbar_single: '▲',
+            // TODO: Revert when more commonly supported
+            // underbar_single: '🭯',
         }
     }
 
