@@ -1036,6 +1036,101 @@ mod tests {
     }
 
     #[test]
+    fn span_numbers_are_char_offsets() {
+        let source = "🍎 == apple";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_label(Label::new(2..4).with_message("comparison operator"))
+            .finish()
+            .write_to_string(Source::from(source));
+        assert_snapshot!(msg, @r###"
+        Error: 
+           ,-[<unknown>:1:1]
+           |
+         1 | 🍎 == apple
+           |    ^|  
+           |     `-- comparison operator
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn empty_span() {
+        let source = "apple";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_label(Label::new(0..0).with_message("first character"))
+            .finish()
+            .write_to_string(Source::from(source));
+        assert_snapshot!(msg, @r###"
+            Error: 
+               ,-[<unknown>:1:1]
+               |
+             1 | apple
+               | | 
+               | `- first character
+            ---'
+            "###);
+    }
+
+    #[test]
+    fn one_char_span() {
+        let source = "apple";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_label(Label::new(0..1).with_message("first character"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: it would be nice if this rendered just like the empty_label test
+        assert_snapshot!(msg, @r###"
+            Error: 
+               ,-[<unknown>:1:1]
+               |
+             1 | apple
+               | |  
+               | `-- first character
+            ---'
+            "###);
+    }
+
+    #[test]
+    fn empty_span_directly_after_end() {
+        let source = "universe";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_label(Label::new(source.len()..source.len()).with_message("outside"))
+            .finish()
+            .write_to_string(Source::from(source));
+        assert_snapshot!(msg, @r###"
+        Error: 
+           ,-[<unknown>:1:1]
+           |
+         1 | universe
+           |         | 
+           |         `- outside
+        ---'
+        "###);
+    }
+
+    #[test]
+    fn span_out_of_bounds() {
+        let source = "universe";
+        let msg = Report::<Range<usize>>::build(ReportKind::Error, (), 0)
+            .with_config(no_color_and_ascii())
+            .with_label(Label::new(source.len() + 1..source.len() + 1).with_message("outside"))
+            .finish()
+            .write_to_string(Source::from(source));
+        // TODO: Report::write should probably panic on out-of-bound spans
+        assert_snapshot!(msg, @r###"
+        Error: 
+           ,-[<unknown>:1:1]
+           |
+           | 
+        ---'
+        "###);
+    }
+
+    #[test]
     fn two_labels_without_messages() {
         let source = "apple == orange;";
         let msg = remove_trailing(
