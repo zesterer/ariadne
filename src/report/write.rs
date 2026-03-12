@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod tests;
-
 use std::fmt::Display;
 use std::io;
 use std::ops::Range;

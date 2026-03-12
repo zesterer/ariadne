@@ -33,7 +33,7 @@ pub struct Characters {
 }
 
 impl Characters {
-    pub fn unicode() -> Self {
+    pub const fn unicode() -> Self {
         Self {
             hbar: '─',
             vbar: '│',
@@ -64,7 +64,7 @@ impl Characters {
         }
     }
 
-    pub fn ascii() -> Self {
+    pub const fn ascii() -> Self {
         Self {
             hbar: '-',
             vbar: '|',
