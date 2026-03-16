@@ -315,7 +315,10 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 .filter(|label_info| matches!(label_info.kind, LabelKind::Multiline))
                 .collect();
             // Sort them by length; this also ensures that the next array is sorted.
-            multi_labels.sort_unstable_by_key(|label_info| !Span::len(&label_info.char_span));
+            // Strictly speaking, a stable sort is overkill here, since we only sort once;
+            // however, an unstable sort would make the results dependent on the underlying
+            // sorting implementation's decisions, which may harm reproducibility.
+            multi_labels.sort_by_key(|label_info| !Span::len(&label_info.char_span));
 
             let mut multi_labels_with_message: Vec<_> = multi_labels
                 .iter()
