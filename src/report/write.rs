@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::Display;
 use std::io;
 use std::ops::Range;
@@ -866,28 +867,27 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
         // Help
         for (i, help) in self.help.iter().enumerate() {
-            if !self.config.compact && (i == 0) {
+            if !self.config.compact && i == 0 {
                 write_margin(&mut w, 0, false, false)?;
                 writeln!(w)?;
             }
-            let help_prefix = format!("{} {}", "Help", i + 1);
-            let help_prefix_len = if self.help.len() > 1 && self.config.enumerate_helps {
-                help_prefix.len()
+            let help_prefix = if self.help.len() > 1 && self.config.enumerate_helps {
+                format!("{} {}", "Help", i + 1).into()
             } else {
-                "Help".len()
+                Cow::Borrowed("Help")
             };
             let mut lines = help.split('\n');
             if let Some(line) = lines.next() {
                 write_margin(&mut w, 0, false, false)?;
-                if self.help.len() > 1 && self.config.enumerate_helps {
-                    writeln!(w, "{}: {line}", help_prefix.fg(self.config.note_color(), s))?;
-                } else {
-                    writeln!(w, "{}: {line}", "Help".fg(self.config.note_color(), s))?;
-                }
+                writeln!(
+                    w,
+                    "{}: {line}",
+                    help_prefix.as_ref().fg(self.config.note_color(), s),
+                )?;
             }
             for line in lines {
                 write_margin(&mut w, 0, false, false)?;
-                writeln!(w, "{:>pad$}{line}", "", pad = help_prefix_len + 2)?;
+                writeln!(w, "{:>pad$}{line}", "", pad = help_prefix.len() + 2)?;
             }
         }
 
@@ -897,24 +897,23 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 write_margin(&mut w, 0, false, false)?;
                 writeln!(w)?;
             }
-            let note_prefix = format!("{} {}", "Note", i + 1);
-            let note_prefix_len = if self.notes.len() > 1 && self.config.enumerate_notes {
-                note_prefix.len()
+            let note_prefix = if self.notes.len() > 1 && self.config.enumerate_notes {
+                format!("{} {}", "Note", i + 1).into()
             } else {
-                "Note".len()
+                Cow::Borrowed("Note")
             };
             let mut lines = note.split('\n');
             if let Some(line) = lines.next() {
                 write_margin(&mut w, 0, false, false)?;
-                if self.notes.len() > 1 && self.config.enumerate_notes {
-                    writeln!(w, "{}: {line}", note_prefix.fg(self.config.note_color(), s),)?;
-                } else {
-                    writeln!(w, "{}: {line}", "Note".fg(self.config.note_color(), s))?;
-                }
+                writeln!(
+                    w,
+                    "{}: {line}",
+                    note_prefix.as_ref().fg(self.config.note_color(), s),
+                )?;
             }
             for line in lines {
                 write_margin(&mut w, 0, false, false)?;
-                writeln!(w, "{:>pad$}{line}", "", pad = note_prefix_len + 2)?;
+                writeln!(w, "{:>pad$}{line}", "", pad = note_prefix.len() + 2)?;
             }
         }
 
@@ -927,7 +926,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 w,
                 "{}",
                 format_args!("{}{}", Rept(draw.hbar, line_num_width + 2), draw.rbot)
-                    .fg(self.config.margin_color(), s)
+                    .fg(self.config.margin_color(), s),
             )?;
         }
 
