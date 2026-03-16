@@ -11,38 +11,39 @@ env:
   RUST_VERSION: 1.85.0
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-
-  cargo-fmt-check:
+  check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: https://github.com/actions/checkout@v3
       - name: Install toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt
-      - name: Check Formatting
-        run: cargo fmt --all -- --check
+      - name: Check
+        run: cargo check --all
+      - name: Formatting
+        run: cargo fmt --all --check
 
-  cargo-clippy:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: https://github.com/actions/checkout@v3
       - name: Install toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - name: Test
+        run: cargo test --all-features --all-targets
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v3
+      - name: Install toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: clippy
-      - uses: Swatinem/rust-cache@v2
       - name: Check Clippy Linter
         run: cargo clippy --all-features --all-targets -- -D warnings
