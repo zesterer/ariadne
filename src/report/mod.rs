@@ -61,7 +61,7 @@ impl<S: Span, K: ReportStyle> fmt::Debug for Report<S, K> {
             .field("notes", &self.notes)
             .field("help", &self.help)
             .field("config", &self.config)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
