@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(test)]
+mod tests;
 
 use std::io::Error;
 use std::{
@@ -208,7 +210,7 @@ impl<I: AsRef<str>> Source<I> {
     /// Get the line that the given offset appears on, and the line/column numbers of the offset.
     ///
     /// Note that the line/column numbers are zero-indexed.
-    pub fn get_offset_line(&self, offset: usize) -> Option<(Line, usize, usize)> {
+    pub fn get_offset_line(&self, offset: usize) -> Option<Location> {
         if offset <= self.len {
             let idx = self
                 .lines
@@ -221,7 +223,11 @@ impl<I: AsRef<str>> Source<I> {
                 offset,
                 line.offset
             );
-            Some((line, idx, offset - line.offset))
+            Some(Location {
+                line,
+                line_idx: idx,
+                col_idx: offset - line.offset,
+            })
         } else {
             None
         }
@@ -230,7 +236,7 @@ impl<I: AsRef<str>> Source<I> {
     /// Get the line that the given byte offset appears on, and the line/byte column numbers of the offset.
     ///
     /// Note that the line/column numbers are zero-indexed.
-    pub fn get_byte_line(&self, byte_offset: usize) -> Option<(Line, usize, usize)> {
+    pub fn get_byte_line(&self, byte_offset: usize) -> Option<Location> {
         if byte_offset <= self.byte_len {
             let idx = self
                 .lines
@@ -243,7 +249,11 @@ impl<I: AsRef<str>> Source<I> {
                 byte_offset,
                 line.byte_offset
             );
-            Some((line, idx, byte_offset - line.byte_offset))
+            Some(Location {
+                line,
+                line_idx: idx,
+                col_idx: byte_offset - line.byte_offset,
+            })
         } else {
             None
         }
@@ -254,10 +264,12 @@ impl<I: AsRef<str>> Source<I> {
     /// The resulting range is guaranteed to contain valid line indices (i.e: those that can be used for
     /// [`Source::line`]).
     pub fn get_line_range<S: Span>(&self, span: &S) -> Range<usize> {
-        let start = self.get_offset_line(span.start()).map_or(0, |(_, l, _)| l);
+        let start = self
+            .get_offset_line(span.start())
+            .map_or(0, |location| location.line_idx);
         let end = self
             .get_offset_line(span.end().saturating_sub(1).max(span.start()))
-            .map_or(self.lines.len(), |(_, l, _)| l + 1);
+            .map_or(self.lines.len(), |location| location.line_idx + 1);
         start..end
     }
 
@@ -265,6 +277,13 @@ impl<I: AsRef<str>> Source<I> {
     pub fn get_line_text(&self, line: Line) -> Option<&'_ str> {
         self.text.as_ref().get(line.byte_span())
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Location {
+    pub line: Line,
+    pub line_idx: usize,
+    pub col_idx: usize,
 }
 
 impl<I: AsRef<str>> Cache<()> for Source<I> {
@@ -387,8 +406,9 @@ where
     }
 }
 
-impl<Id: fmt::Display + Hash + PartialEq + Eq + Clone, F, I, E> Cache<Id> for FnCache<Id, F, I>
+impl<Id, F, I, E> Cache<Id> for FnCache<Id, F, I>
 where
+    Id: fmt::Display + Hash + PartialEq + Eq + Clone,
     I: AsRef<str>,
     E: fmt::Debug,
     F: for<'a> FnMut(&'a Id) -> Result<I, E>,
@@ -419,103 +439,4 @@ where
                 .map(|(id, s)| (id, Source::from(s)))
                 .collect(),
         )
-}
-
-#[cfg(test)]
-mod tests {
-    use std::iter::zip;
-    use std::sync::Arc;
-
-    use super::Source;
-
-    fn test_with_lines(lines: Vec<&str>) {
-        let source: String = lines.iter().copied().collect();
-        let source = Source::from(source);
-
-        assert_eq!(source.lines.len(), lines.len());
-
-        let mut offset = 0;
-        for (source_line, raw_line) in zip(source.lines.iter().copied(), lines.into_iter()) {
-            assert_eq!(source_line.offset, offset);
-            assert_eq!(source_line.char_len, raw_line.chars().count());
-            assert_eq!(source.get_line_text(source_line).unwrap(), raw_line);
-            offset += source_line.char_len;
-        }
-
-        assert_eq!(source.len, offset);
-    }
-
-    #[test]
-    fn source_from_empty() {
-        test_with_lines(vec![""]); // Empty string
-    }
-
-    #[test]
-    fn source_from_single() {
-        test_with_lines(vec!["Single line"]);
-        test_with_lines(vec!["Single line with LF\n"]);
-        test_with_lines(vec!["Single line with CRLF\r\n"]);
-    }
-
-    #[test]
-    fn source_from_multi() {
-        test_with_lines(vec!["Two\r\n", "lines\n"]);
-        test_with_lines(vec!["Some\n", "more\r\n", "lines"]);
-        test_with_lines(vec!["\n", "\r\n", "\n", "Empty Lines"]);
-    }
-
-    #[test]
-    fn source_from_trims_trailing_spaces() {
-        test_with_lines(vec!["Trailing spaces  \n", "are trimmed\t"]);
-    }
-
-    #[test]
-    fn source_from_alternate_line_endings() {
-        // Line endings other than LF or CRLF
-        test_with_lines(vec![
-            "CR\r",
-            "VT\x0B",
-            "FF\x0C",
-            "NEL\u{0085}",
-            "LS\u{2028}",
-            "PS\u{2029}",
-        ]);
-    }
-
-    #[test]
-    fn source_from_other_string_types() {
-        let raw = r#"A raw string
-            with multiple
-            lines behind
-            an Arc"#;
-        let arc = Arc::from(raw);
-        let source = Source::from(arc);
-
-        assert_eq!(source.lines.len(), 4);
-
-        let mut offset = 0;
-        for (source_line, raw_line) in zip(source.lines.iter().copied(), raw.split_inclusive('\n'))
-        {
-            assert_eq!(source_line.offset, offset);
-            assert_eq!(source_line.char_len, raw_line.chars().count());
-            assert_eq!(source.get_line_text(source_line).unwrap(), raw_line);
-            offset += source_line.char_len;
-        }
-
-        assert_eq!(source.len, offset);
-    }
-
-    #[test]
-    fn source_from_reference() {
-        let raw = r#"A raw string
-            with multiple
-            lines"#;
-
-        fn non_owning_source(input: &str) -> Source<&str> {
-            Source::from(input)
-        }
-
-        let source = non_owning_source(raw);
-        assert_eq!(source.lines.len(), 3);
-    }
 }

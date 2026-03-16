@@ -33,7 +33,7 @@ pub struct Characters {
 }
 
 impl Characters {
-    pub fn unicode() -> Self {
+    pub const fn unicode() -> Self {
         Self {
             hbar: '─',
             vbar: '│',
@@ -64,7 +64,7 @@ impl Characters {
         }
     }
 
-    pub fn ascii() -> Self {
+    pub const fn ascii() -> Self {
         Self {
             hbar: '-',
             vbar: '|',
@@ -88,6 +88,22 @@ impl Characters {
             munderbar: '-',
             underline: '-',
             underbar_single: '^',
+        }
+    }
+
+    pub(crate) fn arrow_bend(&self, is_top: bool) -> char {
+        if is_top {
+            self.ltop
+        } else {
+            self.lbot
+        }
+    }
+
+    pub(crate) fn vbar(&self, is_gap: bool) -> char {
+        if is_gap {
+            self.vbar_gap
+        } else {
+            self.vbar
         }
     }
 }
