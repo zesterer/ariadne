@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: https://github.com/actions/checkout@v3
       - name: Install toolchain
-        uses: https://github.com/dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
       - name: Test
@@ -41,9 +41,22 @@ jobs:
     steps:
       - uses: https://github.com/actions/checkout@v3
       - name: Install toolchain
-        uses: https://github.com/dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: clippy
-      - name: Check Clippy Linter
+      - name: Lint
         run: cargo clippy --all-features --all-targets -- -D warnings
+
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v3
+      - name: Install toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly
+      - name: Install cargo-binstall
+        uses: https://github.com/cargo-bins/cargo-binstall@main
+      - name: Semver compatibility
+        run: cargo binstall cargo-semver-checks && cargo +nightly semver-checks
