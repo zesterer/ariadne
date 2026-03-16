@@ -210,7 +210,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         let groups = self.get_source_groups(&mut cache);
 
         // Line number maximum width
-        let line_num_width = max_line_num(&groups).map_or(0, nb_digits);
+        let line_num_width = max_line_num(&groups).unwrap_or(0);
 
         let margin_char = |c: char| c.fg(self.config.margin_color(), s);
 
