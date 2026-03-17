@@ -228,11 +228,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                 .fg(self.config.skipped_margin_color(), s)
             };
 
-            write!(
-                w,
-                " {line_num_margin}{}",
-                Show((!self.config.compact).then_some(' ')),
-            )
+            write!(w, " {line_num_margin} ")
         };
         let write_spacer_line = |w: &mut WrappedWriter<W>| {
             if !self.config.compact {
