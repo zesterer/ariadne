@@ -143,11 +143,4 @@ that its veracity and coherence is vouched for by sentient intelligence with ski
 
 ## Contribution guidelines
 
-We expect contributors to adhere to the ethos of the project.
-
-Source code is not an artifact, an intermediate representation, nor a bothersome annoyance whose creation is to be
-offloaded to metal and transistors. Source code is a **source of truth** - the only source of truth that constitutes this
-software project - and it deserves to be understood and curated by the *accountable* and *reasoned* mind of a human being.
-
-Please refrain from contributing changes that you have not personally understood and instigated the authorship of. We do
-not expect perfection, but we do expect you to personally understand your own motivations and decisions.
+See [`CONTRIBUTING.md`](CONTRIBUTING).
