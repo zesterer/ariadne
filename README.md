@@ -123,6 +123,8 @@ messages. Minor tweaks to the internal layout heuristics can often result in the
 with labels moving slightly. If you experience a change in layout that you believe to be a regression (either the change
 is incorrect, or makes your diagnostics harder to read) then please open an issue.
 
+Ariadne currently has a Minimum Supported Rust Version (MSRV) of `1.85.0`.
+
 ## Credit
 
 Thanks to:
