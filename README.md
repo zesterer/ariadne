@@ -13,7 +13,7 @@ A fancy compiler diagnostics crate.
 <img src="https://raw.githubusercontent.com/zesterer/ariadne/main/misc/example.png" alt="Ariadne supports arbitrary multi-line spans"/>
 </a>
 
-```rust,ignore
+```rust
 fn main() {
     use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 
