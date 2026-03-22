@@ -9,7 +9,6 @@ use crate::{
 #[must_use = "call `.finish()` to obtain a `Report`"]
 pub struct ReportBuilder<S: Span, K: ReportStyle> {
     pub(crate) kind: K,
-    pub(crate) code: Option<String>,
     pub(crate) msg: Option<String>,
     pub(crate) notes: Vec<String>,
     pub(crate) help: Vec<String>,
@@ -19,12 +18,6 @@ pub struct ReportBuilder<S: Span, K: ReportStyle> {
 }
 
 impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
-    /// Give this report a numerical code that may be used to more precisely look up the error in documentation.
-    pub fn with_code<C: fmt::Display>(mut self, code: C) -> Self {
-        self.code = Some(format!("{code:02}"));
-        self
-    }
-
     /// Set the message of this report.
     pub fn set_message<M: ToString>(&mut self, msg: M) {
         self.msg = Some(msg.to_string());
@@ -118,7 +111,6 @@ impl<S: Span, K: ReportStyle> ReportBuilder<S, K> {
     pub fn finish(self) -> Report<S, K> {
         Report {
             kind: self.kind,
-            code: self.code,
             msg: self.msg,
             notes: self.notes,
             help: self.help,
@@ -133,7 +125,6 @@ impl<S: Span, K: ReportStyle> fmt::Debug for ReportBuilder<S, K> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)
-            .field("code", &self.code)
             .field("msg", &self.msg)
             .field("notes", &self.notes)
             .field("help", &self.help)

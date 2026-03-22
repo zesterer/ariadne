@@ -23,7 +23,6 @@ let b = colors.next();
 let out = Color::Blue;
 
 Report::build(ReportKind::Error, ("sample.tao", 12..12))
-    .with_code(3)
     .with_message(format!("Incompatible types"))
     .with_label(Label::new(("sample.tao", 32..33))
         .with_message(format!("This is of type {}", "Nat".fg(a)))

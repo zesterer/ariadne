@@ -13,7 +13,6 @@ pub(crate) mod write;
 #[must_use = "call `.print()` or `.eprint()` to print the report"]
 pub struct Report<S: Span = Range<usize>, K: ReportStyle = ReportKind> {
     kind: K,
-    code: Option<String>,
     msg: Option<String>,
     notes: Vec<String>,
     help: Vec<String>,
@@ -29,7 +28,6 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
     pub fn build(kind: K, span: S) -> ReportBuilder<S, K> {
         ReportBuilder {
             kind,
-            code: None,
             msg: None,
             notes: vec![],
             help: vec![],
@@ -56,7 +54,6 @@ impl<S: Span, K: ReportStyle> fmt::Debug for Report<S, K> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Report")
             .field("kind", &self.kind)
-            .field("code", &self.code)
             .field("msg", &self.msg)
             .field("notes", &self.notes)
             .field("help", &self.help)
