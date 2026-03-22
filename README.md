@@ -21,29 +21,23 @@ let mut colors = ColorGenerator::new();
 // Generate & choose some colours for each of our elements
 let a = colors.next();
 let b = colors.next();
-let out = Color::Fixed(81);
+let out = Color::Blue;
 
 Report::build(ReportKind::Error, ("sample.tao", 12..12))
     .with_code(3)
     .with_message(format!("Incompatible types"))
-    .with_label(
-        Label::new(("sample.tao", 32..33))
-            .with_message(format!("This is of type {}", "Nat".fg(a)))
-            .with_color(a),
-    )
-    .with_label(
-        Label::new(("sample.tao", 42..45))
-            .with_message(format!("This is of type {}", "Str".fg(b)))
-            .with_color(b),
-    )
-    .with_label(
-        Label::new(("sample.tao", 11..48))
-            .with_message(format!(
-                "The values are outputs of this {} expression",
-                "match".fg(out),
-            ))
-            .with_color(out),
-    )
+    .with_label(Label::new(("sample.tao", 32..33))
+        .with_message(format!("This is of type {}", "Nat".fg(a)))
+        .with_color(a))
+    .with_label(Label::new(("sample.tao", 42..45))
+        .with_message(format!("This is of type {}", "Str".fg(b)))
+        .with_color(b))
+    .with_label(Label::new(("sample.tao", 11..48))
+        .with_message(format!(
+            "The values are outputs of this {} expression",
+            "match".fg(out),
+        ))
+        .with_color(out))
     .with_note(format!(
         "Outputs of {} expressions must coerce to the same type",
         "match".fg(out)
@@ -51,6 +45,38 @@ Report::build(ReportKind::Error, ("sample.tao", 12..12))
     .finish()
     .print(("sample.tao", Source::from(include_str!("sample.tao"))))
     .unwrap();
+```
+
+```ansi
+[31mError[0m: Incompatible types
+[38;5;246m   [0m[38;5;246m╭[0m[38;5;246m─[0m[38;5;246m┤[0m <unknown>:2:10 [38;5;246m│[0m
+   [38;5;246m│[0m
+ [38;5;246m2 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m([0m[38;5;249m)[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m>[0m[38;5;249m [0m5[38;5;249m,[0m
+ [38;5;240m  │[0m           ▲  
+ [38;5;240m  │[0m           ╰── This is of type Nat
+ [38;5;240m  │[0m 
+ [38;5;246m4 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m([0m[38;5;249m)[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m>[0m[38;5;249m [0m"5"[38;5;249m,[0m
+ [38;5;240m  │[0m           ─┬─  
+ [38;5;240m  │[0m            ╰─── This is of type Str
+[38;5;246m───╯[0m
+[31m[03] Error[0m: Incompatible types
+[38;5;246m   [0m[38;5;246m╭[0m[38;5;246m─[0m[38;5;246m┤[0m sample.tao:1:13 [38;5;246m│[0m
+   [38;5;246m│[0m
+ [38;5;246m1 │[0m [34m╭[0m[34m─[0m[34m▶[0m[34m [0m[38;5;249md[0m[38;5;249me[0m[38;5;249mf[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249mi[0m[38;5;249mv[0m[38;5;249me[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m[34mm[0m[34ma[0m[34mt[0m[34mc[0m[34mh[0m[34m [0m[34m([0m[34m)[0m[34m [0m[34mi[0m[34mn[0m[34m [0m[34m{[0m
+ [38;5;246m2 │[0m [34m│[0m   [34m [0m[34m [0m[34m [0m[34m [0m[34m([0m[34m)[0m[34m [0m[34m=[0m[34m>[0m[34m [0m[38;5;201m5[0m[34m,[0m
+ [38;5;240m  │[0m [34m│[0m             [38;5;201m▲[0m  
+ [38;5;240m  │[0m [34m│[0m             [38;5;201m╰[0m[38;5;201m─[0m[38;5;201m─[0m This is of type [38;5;201mNat[0m
+ [38;5;240m  ┆[0m [34m┆[0m   
+ [38;5;246m4 │[0m [34m│[0m   [34m [0m[34m [0m[34m [0m[34m [0m[34m([0m[34m)[0m[34m [0m[34m=[0m[34m>[0m[34m [0m[38;5;155m"[0m[38;5;155m5[0m[38;5;155m"[0m[34m,[0m
+ [38;5;240m  │[0m [34m│[0m             [38;5;155m─[0m[38;5;155m┬[0m[38;5;155m─[0m  
+ [38;5;240m  │[0m [34m│[0m              [38;5;155m╰[0m[38;5;155m─[0m[38;5;155m─[0m[38;5;155m─[0m This is of type [38;5;155mStr[0m
+ [38;5;246m5 │[0m [34m├[0m[34m─[0m[34m▶[0m[34m [0m[34m}[0m
+ [38;5;240m  │[0m [34m│[0m       
+ [38;5;240m  │[0m [34m╰[0m[34m─[0m[34m─[0m[34m─[0m[34m─[0m[34m─[0m[34m─[0m[34m─[0m The values are outputs of this [34mmatch[0m expression
+ [38;5;240m  │[0m 
+ [38;5;240m  │[0m [38;5;115mNote[0m: Outputs of [34mmatch[0m expressions must coerce to the same type
+[38;5;246m───╯[0m
+
 ```
 
 See [`examples/`](https://github.com/zesterer/ariadne/tree/main/examples) for more examples.

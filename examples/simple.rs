@@ -1,4 +1,5 @@
 use ariadne::{Color, Config, Label, Report, ReportKind, Source};
+use ariadne::{Fmt, ColorGenerator};
 
 fn main() {
     Report::build(ReportKind::Error, 34..34)
@@ -8,26 +9,34 @@ fn main() {
         .finish()
         .print(Source::from(include_str!("sample.tao")))
         .unwrap();
+    
+    let mut colors = ColorGenerator::new();
 
-    const SOURCE: &str = "a b c d e f";
-    // also supports labels with no messages to only emphasis on some areas
-    Report::build(ReportKind::Error, 2..3)
-        .with_message("Incompatible types")
-        .with_config(Config::default().with_compact(true))
-        .with_label(Label::new(0..1).with_color(Color::Red))
-        .with_label(
-            Label::new(2..3)
-                .with_color(Color::Blue)
-                .with_message("`b` for banana")
-                .with_order(1),
-        )
-        .with_label(Label::new(4..5).with_color(Color::Green))
-        .with_label(
-            Label::new(7..9)
-                .with_color(Color::Cyan)
-                .with_message("`e` for emerald"),
-        )
+    // Generate & choose some colours for each of our elements
+    let a = colors.next();
+    let b = colors.next();
+    let out = Color::Blue;
+    
+    Report::build(ReportKind::Error, ("sample.tao", 12..12))
+        .with_code(3)
+        .with_message(format!("Incompatible types"))
+        .with_label(Label::new(("sample.tao", 32..33))
+            .with_message(format!("This is of type {}", "Nat".fg(a)))
+            .with_color(a))
+        .with_label(Label::new(("sample.tao", 52..55))
+            .with_message(format!("This is of type {}", "Str".fg(b)))
+            .with_color(b))
+        .with_label(Label::new(("sample.tao", 11..58))
+            .with_message(format!(
+                "The values are outputs of this {} expression",
+                "match".fg(out),
+            ))
+            .with_color(out))
+        .with_note(format!(
+            "Outputs of {} expressions must coerce to the same type",
+            "match".fg(out)
+        ))
         .finish()
-        .print(Source::from(SOURCE))
+        .print(("sample.tao", Source::from(include_str!("sample.tao"))))
         .unwrap();
 }
