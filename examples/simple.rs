@@ -1,5 +1,4 @@
-use ariadne::{Color, Config, Label, Report, ReportKind, Source};
-use ariadne::{ColorGenerator, Fmt};
+use ariadne::{Label, Report, ReportKind, Source};
 
 fn main() {
     Report::build(ReportKind::Error, 34..34)
