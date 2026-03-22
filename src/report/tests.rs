@@ -873,11 +873,10 @@ fn only_help_and_note() {
     );
     assert_snapshot!(msg, @r###"
         Error: Programming language "Rest" not found
-          │
-          │ Help: a language with a similar name exists: Rust
-          │
-          │ Note: perhaps you'd like some sleep?
-        ──╯
+        
+        Help: a language with a similar name exists: Rust
+        
+        Note: perhaps you'd like some sleep?
         "###)
 }
 
@@ -952,5 +951,25 @@ fn help_and_note_multi() {
            │
            │ Note: stop trying ... this is a fruitless endeavor
         ───╯
+        ")
+}
+
+#[test]
+fn no_labels() {
+    let msg = remove_trailing(
+        Report::build(ReportKind::Error, (0, 0..0))
+            .with_config(no_color())
+            .with_message("no code")
+            .with_help("have you tried adding code?")
+            .with_note("code needs to exist")
+            .finish()
+            .write_to_string(multi_sources(&[])),
+    );
+    assert_snapshot!(msg, @"
+        Error: no code
+        
+        Help: have you tried adding code?
+        
+        Note: code needs to exist
         ")
 }

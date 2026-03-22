@@ -215,19 +215,23 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
         let margin_char = |c: char| c.fg(self.config.margin_color(), s);
 
         let write_margin = |w: &mut WrappedWriter<W>, idx, is_src_line, is_ellipsis: bool| {
-            let line_num_margin = if is_src_line && !is_ellipsis {
-                format!("{:line_num_width$} {}", idx + 1, draw.vbar)
-                    .fg(self.config.margin_color(), s)
+            if groups.is_empty() {
+                Ok(())
             } else {
-                format!(
-                    "{}{}",
-                    Rept(' ', line_num_width + 1),
-                    draw.vbar(is_ellipsis)
-                )
-                .fg(self.config.skipped_margin_color(), s)
-            };
+                let line_num_margin = if is_src_line && !is_ellipsis {
+                    format!("{:line_num_width$} {}", idx + 1, draw.vbar)
+                        .fg(self.config.margin_color(), s)
+                } else {
+                    format!(
+                        "{}{}",
+                        Rept(' ', line_num_width + 1),
+                        draw.vbar(is_ellipsis)
+                    )
+                    .fg(self.config.skipped_margin_color(), s)
+                };
 
-            write!(w, " {line_num_margin} ")
+                write!(w, " {line_num_margin} ")
+            }
         };
         let write_spacer_line = |w: &mut WrappedWriter<W>| {
             if !self.config.compact {
@@ -914,9 +918,7 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
 
         // Tail of report.
         // Not to be emitted in compact mode, or if nothing has had the margin printed.
-        if !(self.config.compact
-            || groups.is_empty() && self.help.is_empty() && self.notes.is_empty())
-        {
+        if !(self.config.compact || groups.is_empty()) {
             writeln!(
                 w,
                 "{}",
