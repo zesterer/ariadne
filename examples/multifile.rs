@@ -9,7 +9,6 @@ fn main() {
     let c = colors.next();
 
     Report::build(ReportKind::Error, ("b.tao", 10..14))
-        .with_code(3)
         .with_message("Cannot add types Nat and Str".to_string())
         .with_label(
             Label::new(("b.tao", 10..14))

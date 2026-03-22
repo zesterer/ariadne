@@ -4,7 +4,6 @@ fn main() {
     let mut colors = ColorGenerator::new();
 
     Report::build(ReportKind::Error, ("stresstest.tao", 13..13))
-        .with_code(3)
         .with_message("Incompatible types".to_string())
         .with_label(
             Label::new(("stresstest.tao", 0..1))
