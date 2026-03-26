@@ -10,7 +10,8 @@
 use insta::assert_snapshot;
 
 use crate::{
-    Cache, Config, FnCache, IndexType, Label, Report, ReportKind, ReportStyle, Source, Span,
+    Cache, Config, FnCache, IndexType, Label, LabelCollapseLines, Report, ReportKind, ReportStyle,
+    Source, Span,
 };
 
 impl<S: Span, K: ReportStyle> Report<S, K> {
@@ -494,6 +495,60 @@ fn multiple_multilines_same_span() {
        │   ╰─│────────┴── do not do this
        │     │        │  
        │     ╰────────┴── please reconsider
+    ───╯
+    ");
+}
+
+#[test]
+fn multiline_label_show_3() {
+    let source = "pear\napple\n==\norange\nbanana";
+    let msg = remove_trailing(
+        Report::build(ReportKind::Error, 0..0)
+            .with_config(no_color())
+            .with_label(
+                Label::new(5..20)
+                    .with_message("illegal comparison")
+                    .with_collapse_lines_when(LabelCollapseLines::MaxLines(3)),
+            )
+            .finish()
+            .write_to_string(Source::from(source)),
+    );
+    assert_snapshot!(msg, @r"
+    Error:
+       ╭─┤ <unknown>:1:1 │
+       │
+     2 │ ╭─▶ apple
+     3 │ │   ==
+     4 │ ├─▶ orange
+       │ │
+       │ ╰──────────── illegal comparison
+    ───╯
+    ");
+}
+
+#[test]
+fn multiline_label_longer_than_max_span_line_count() {
+    let source = "pear\napple\n==\norange\nbanana";
+    let msg = remove_trailing(
+        Report::build(ReportKind::Error, 0..0)
+            .with_config(no_color())
+            .with_label(
+                Label::new(5..source.len())
+                    .with_message("illegal comparison")
+                    .with_collapse_lines_when(LabelCollapseLines::MaxLines(3)),
+            )
+            .finish()
+            .write_to_string(Source::from(source)),
+    );
+    assert_snapshot!(msg, @r"
+    Error:
+       ╭─┤ <unknown>:1:1 │
+       │
+     2 │ ╭─▶ apple
+       ┆ ┆
+     5 │ ├─▶ banana
+       │ │
+       │ ╰─────────── illegal comparison
     ───╯
     ");
 }
