@@ -11,6 +11,7 @@ pub(crate) struct LabelDisplay {
     pub color: Option<Color>,
     pub order: i32,
     pub priority: i32,
+    pub collapse_when: LabelCollapseLines,
 }
 
 /// A type that represents a labelled section of source code.
@@ -37,6 +38,7 @@ impl<S: Span> Label<S> {
                 color: None,
                 order: 0,
                 priority: 0,
+                collapse_when: LabelCollapseLines::Always,
             },
         }
     }
@@ -81,6 +83,14 @@ impl<S: Span> Label<S> {
         self.display_info.priority = priority;
         self
     }
+
+    /// Specify when the label should hide multiline spans
+    ///
+    /// If unspecified, defaults to always collapsing multiline labels with `LabelCollapseLines::Always`
+    pub fn with_collapse_lines_when(mut self, collapse_when: LabelCollapseLines) -> Self {
+        self.display_info.collapse_when = collapse_when;
+        self
+    }
 }
 
 /// The attachment point of inline label arrows
@@ -93,6 +103,18 @@ pub enum LabelAttach {
     /// Arrows should attach to the end of the label span.
     End,
 }
+
+/// Whether a multiline label should hide its contents
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum LabelCollapseLines {
+    /// Hides the contents of the label with if it's over the line limit
+    MaxLines(usize),
+    /// Always hides contents of multiline labels (only show first and last lines)
+    Always,
+    /// Always show the entire label contents (always show full span)
+    Never,
+}
+
 #[test]
 #[should_panic]
 #[allow(clippy::reversed_empty_ranges)]

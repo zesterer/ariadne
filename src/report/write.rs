@@ -4,7 +4,7 @@ use std::io;
 use std::ops::Range;
 
 use crate::source::Location;
-use crate::{Config, IndexType, LabelDisplay, Source};
+use crate::{Config, IndexType, LabelCollapseLines, LabelDisplay, Source};
 
 use super::draw::{self, StreamAwareFmt, StreamType, WrappedWriter};
 use super::{Cache, CharSet, LabelAttach, Report, ReportStyle, Rept, Show, Span, Write};
@@ -601,7 +601,20 @@ impl<S: Span, K: ReportStyle> Report<S, K> {
                         .iter()
                         .any(|label| label.char_span.contains(&line.span().start()));
                     if !is_ellipsis && within_label {
-                        is_ellipsis = true;
+                        // Check to see if all the multiline labels containing this line should be hidden
+                        let should_collapse = multi_labels
+                            .iter()
+                            .filter(|label| label.char_span.contains(&line.span().start()))
+                            .all(|label| match label.display_info.collapse_when {
+                                LabelCollapseLines::Always => true,
+                                LabelCollapseLines::MaxLines(max_lines) => {
+                                    label.end_line - label.start_line >= max_lines
+                                }
+                                LabelCollapseLines::Never => false,
+                            });
+                        if should_collapse {
+                            is_ellipsis = true;
+                        }
                     } else {
                         if !self.config.compact && !is_ellipsis {
                             write_margin(&mut w, idx, false, is_ellipsis)?;
